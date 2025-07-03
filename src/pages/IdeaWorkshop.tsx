@@ -255,26 +255,39 @@ const IdeaWorkshop = () => {
         // Strategy 1: Direct JSON (ideal case)
         () => JSON.parse(response.trim()),
         
-        // Strategy 2: JSON in code blocks
+        // Strategy 2: JSON Array in code blocks
+        () => {
+          const codeBlockMatch = response.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+          return codeBlockMatch ? JSON.parse(codeBlockMatch[1]) : null;
+        },
+        
+        // Strategy 3: JSON Object in code blocks
         () => {
           const codeBlockMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
           return codeBlockMatch ? JSON.parse(codeBlockMatch[1]) : null;
         },
         
-        // Strategy 3: JSON between curly braces
+        // Strategy 4: JSON Array between brackets
+        () => {
+          const jsonMatch = response.match(/(\[[\s\S]*\])/);
+          return jsonMatch ? JSON.parse(jsonMatch[1]) : null;
+        },
+        
+        // Strategy 5: JSON Object between curly braces
         () => {
           const jsonMatch = response.match(/(\{[\s\S]*\})/);
           return jsonMatch ? JSON.parse(jsonMatch[1]) : null;
         },
         
-        // Strategy 4: Extract JSON-like content and clean it
+        // Strategy 6: Extract JSON-like content and clean it
         () => {
           let cleaned = response
-            .replace(/^[^{]*/, '') // Remove everything before first {
-            .replace(/[^}]*$/, '') // Remove everything after last }
+            .replace(/^[^{[]*/, '') // Remove everything before first { or [
+            .replace(/[^}\]]*$/, '') // Remove everything after last } or ]
             .trim();
           
-          if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+          if ((cleaned.startsWith('{') && cleaned.endsWith('}')) || 
+              (cleaned.startsWith('[') && cleaned.endsWith(']'))) {
             return JSON.parse(cleaned);
           }
           return null;
@@ -285,7 +298,7 @@ const IdeaWorkshop = () => {
       for (const strategy of jsonExtractionStrategies) {
         try {
           jsonData = strategy();
-          if (jsonData && typeof jsonData === 'object') {
+          if (jsonData && (typeof jsonData === 'object' || Array.isArray(jsonData))) {
             console.log('Successfully extracted JSON:', jsonData);
             break;
           }
@@ -295,7 +308,19 @@ const IdeaWorkshop = () => {
         }
       }
 
-      // Step 2: Validate and structure the JSON data
+      // Step 2: Handle array responses (multiple ideas)
+      if (Array.isArray(jsonData)) {
+        console.log('Processing array of ideas, selecting index:', index);
+        const ideaData = jsonData[index] || jsonData[0] || null;
+        if (ideaData) {
+          jsonData = ideaData;
+        } else {
+          console.log('No valid idea found at index, falling back');
+          jsonData = null;
+        }
+      }
+
+      // Step 3: Validate and structure the JSON data
       if (jsonData) {
         const validateField = (field: any, fallback: any) => {
           return field && (typeof field === typeof fallback) ? field : fallback;
@@ -331,7 +356,7 @@ const IdeaWorkshop = () => {
         return result;
       }
 
-      // Step 3: If JSON parsing failed, fall back to smart text parsing
+      // Step 4: If JSON parsing failed, fall back to smart text parsing
       console.log('JSON parsing failed, falling back to text parsing');
       return parseTextFallback(response, index, fallbackIdea);
 
@@ -413,13 +438,94 @@ const IdeaWorkshop = () => {
         Time Commitment: ${formData.timeCommitment}
       `;
 
-             const response = await geminiService.generateProjectIdea(userInput);
-       console.log('Raw Gemini Response:', response);
+                   const response = await geminiService.generateProjectIdea(userInput);
+      console.log('Raw Gemini Response:', response);
 
-       // Parse the ideas from the response
-       const ideas = response.split('---').map((ideaText, index) => 
-         parseAIResponse(ideaText.trim(), index)
-       ).filter(idea => idea.title && idea.description);
+      // Parse the ideas from the response
+      let ideas: GeneratedIdea[] = [];
+      
+      try {
+        // First try to parse as a single JSON array
+        let jsonData = null;
+        
+        // Try to extract JSON array from the response
+        const jsonExtractionStrategies = [
+          // Strategy 1: Direct JSON array
+          () => JSON.parse(response.trim()),
+          
+          // Strategy 2: JSON array in code blocks
+          () => {
+            const codeBlockMatch = response.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+            return codeBlockMatch ? JSON.parse(codeBlockMatch[1]) : null;
+          },
+          
+          // Strategy 3: Extract JSON array content
+          () => {
+            const jsonMatch = response.match(/(\[[\s\S]*\])/);
+            return jsonMatch ? JSON.parse(jsonMatch[1]) : null;
+          }
+        ];
+
+        // Try each extraction strategy
+        for (const strategy of jsonExtractionStrategies) {
+          try {
+            jsonData = strategy();
+            if (Array.isArray(jsonData) && jsonData.length > 0) {
+              console.log('Successfully extracted JSON array:', jsonData);
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+
+        // If we got a JSON array, process each idea
+        if (Array.isArray(jsonData)) {
+          ideas = jsonData.map((ideaData, index) => {
+            const validateField = (field: any, fallback: any) => {
+              return field && (typeof field === typeof fallback) ? field : fallback;
+            };
+
+            const validateArray = (arr: any, fallback: any[], maxLength = 10) => {
+              if (Array.isArray(arr) && arr.length > 0) {
+                return arr.filter(item => typeof item === 'string' && item.trim().length > 0).slice(0, maxLength);
+              }
+              return fallback;
+            };
+
+            const validateDifficulty = (diff: any): 'Beginner' | 'Intermediate' | 'Advanced' => {
+              const validDifficulties = ['Beginner', 'Intermediate', 'Advanced'];
+              return validDifficulties.includes(diff) ? diff : 'Beginner';
+            };
+
+            return {
+              id: index + 1,
+              title: validateField(ideaData.title, `Project Idea ${index + 1}`),
+              description: validateField(ideaData.description, "A modern web application with innovative features."),
+              difficulty: validateDifficulty(ideaData.difficulty),
+              timeEstimate: validateField(ideaData.timeEstimate, "2-3 weeks"),
+              techStack: validateArray(ideaData.techStack, ["React", "TypeScript", "Tailwind CSS", "Firebase"], 6),
+              marketPotential: validateField(ideaData.marketPotential, "Medium"),
+              features: validateArray(ideaData.features, ["User Interface", "Data Management", "User Authentication", "Responsive Design"], 8),
+              learningObjectives: validateArray(ideaData.learningObjectives, ["React Development", "Database Integration", "UI/UX Design"], 6),
+              why: `Perfect for learning ${ideaData.learningObjectives?.slice(0, 2).join(" and ") || "development skills"}`,
+              roadmap: ["UI Design & Planning", "Core Feature Development", "Database Integration", "Testing & Polish", "Deployment & Launch"]
+            };
+          }).filter(idea => idea.title && idea.description);
+        } else {
+          // Fallback to splitting by --- if not a JSON array
+          console.log('Not a JSON array, trying to split by ---');
+          ideas = response.split('---').map((ideaText, index) => 
+            parseAIResponse(ideaText.trim(), index)
+          ).filter(idea => idea.title && idea.description);
+        }
+      } catch (parseError) {
+        console.error('Error parsing JSON response:', parseError);
+        // Fallback to splitting by --- if JSON parsing fails
+        ideas = response.split('---').map((ideaText, index) => 
+          parseAIResponse(ideaText.trim(), index)
+        ).filter(idea => idea.title && idea.description);
+      }
 
       // Ensure we have at least 3 ideas
       const finalIdeas = ideas.length >= 3 ? ideas.slice(0, 3) : [
