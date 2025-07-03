@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "description": "AI Development Accelerator - Turn any app idea into working code in 24 hours",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

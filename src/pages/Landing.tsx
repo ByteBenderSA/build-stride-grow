@@ -11,18 +11,18 @@ const Landing = () => {
   const features = [
     {
       icon: <Zap className="w-6 h-6" />,
-      title: "AI-Powered Guidance",
-      description: "Get personalized mentorship 24/7 with intelligent assistance that adapts to your learning style."
+      title: "Smart Idea Enhancement",
+      description: "Transform your raw app concept into detailed specifications that AI tools can execute perfectly."
     },
     {
       icon: <Target className="w-6 h-6" />,
-      title: "Project-Based Learning",
-      description: "Build real applications from day one. No more tutorial hell - create apps that matter."
+      title: "Professional AI Prompts",
+      description: "Get battle-tested prompts for Lovable and Cursor that create production-quality code."
     },
     {
-      icon: <Users className="w-6 h-6" />,
-      title: "Supportive Community",
-      description: "Connect with fellow builders and celebrate wins together in our vibrant community."
+      icon: <Rocket className="w-6 h-6" />,
+      title: "Complete AI Workflow",
+      description: "Seamless integration from idea to deployed app using the latest AI development tools."
     }
   ];
 
@@ -64,32 +64,32 @@ const Landing = () => {
         <div className="max-w-5xl mx-auto">
           <Badge className="mb-8 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 border-purple-200 px-6 py-3 text-sm font-medium rounded-full">
             <Sparkles className="w-4 h-4 mr-2" />
-            AI-Powered Learning Platform
+            AI Development Accelerator
           </Badge>
           
           <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
             <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-              From Idea to App in 
+              Turn Any App Idea Into 
             </span>
             <br />
             <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              Weeks, Not Years
+              Working Code in 24 Hours
             </span>
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-600 mb-12 leading-relaxed max-w-4xl mx-auto">
-            Master modern web development with AI-guided mentorship and hands-on projects. 
-            Build real apps while learning the skills that actually matter.
+            Skip months of learning. Get professional-quality prompts for Lovable and Cursor AI. 
+            Transform your app ideas into deployed applications using cutting-edge AI development tools.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
             <Link to="/signup">
               <Button size="lg" className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white text-lg px-12 py-6 h-auto rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
-                Start Your Journey <ArrowRight className="ml-2 w-5 h-5" />
+                Build Your App Now <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </Link>
             <Button size="lg" variant="outline" className="text-lg px-12 py-6 h-auto rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-purple-300 transition-all duration-300">
-              Watch Demo
+              See How It Works
             </Button>
           </div>
 
@@ -97,15 +97,15 @@ const Landing = () => {
           <div className="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-500">
             <div className="flex items-center gap-2">
               <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              <span className="font-medium">4.9/5 from 1,000+ students</span>
+              <span className="font-medium">Idea to app in hours, not months</span>
             </div>
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-purple-500" />
-              <span className="font-medium">Join 5,000+ builders</span>
+              <span className="font-medium">No coding experience required</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-500" />
-              <span className="font-medium">Free to start</span>
+              <span className="font-medium">Professional-quality results</span>
             </div>
           </div>
         </div>
@@ -115,10 +115,10 @@ const Landing = () => {
       <section className="container mx-auto px-6 py-20">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Everything You Need to Succeed
+            The Complete AI Development Workflow
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Comprehensive learning experience designed for real-world success
+            From raw idea to deployed app using professional AI development tools
           </p>
         </div>
         
@@ -145,8 +145,66 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Success Story */}
+      {/* How It Works Section */}
       <section className="bg-white py-20">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+              Your App in 4 Simple Steps
+            </h2>
+            <p className="text-xl text-gray-600">
+              No coding required. No months of learning. Just results.
+            </p>
+          </div>
+          
+          <div className="max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-purple-700 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                  1
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">Describe Your App Idea</h3>
+                  <p className="text-gray-600">Tell us your vision. Our AI enhances it into detailed specifications with features, design, and technical requirements.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                  2
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">Get Professional Prompts</h3>
+                  <p className="text-gray-600">Receive battle-tested prompts for Lovable.dev that create professional frontend code and Cursor prompts for backend development.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-green-600 to-green-700 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                  3
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">Build with AI Tools</h3>
+                  <p className="text-gray-600">Use our prompts in Lovable for frontend, sync to GitHub, then enhance with Cursor AI for backend features. We guide every step.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                  4
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">Deploy & Launch</h3>
+                  <p className="text-gray-600">Your app is ready for the world. Deploy to production and start getting users with our deployment guidance.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Success Story */}
+      <section className="bg-gray-50 py-20">
         <div className="container mx-auto px-6">
           <div className="max-w-4xl mx-auto text-center">
             <Badge className="mb-8 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border-green-200 px-6 py-3 text-sm font-medium rounded-full">
@@ -154,7 +212,7 @@ const Landing = () => {
               Success Story
             </Badge>
             
-            <Card className="p-12 border-0 shadow-2xl bg-gradient-to-br from-gray-50 to-white">
+            <Card className="p-12 border-0 shadow-2xl bg-gradient-to-br from-white to-gray-50">
               <CardContent className="p-0">
                 <div className="flex flex-col md:flex-row items-center gap-8">
                   <img 
@@ -164,22 +222,22 @@ const Landing = () => {
                   />
                   <div className="flex-1 text-center md:text-left">
                     <blockquote className="text-2xl font-medium mb-6 text-gray-800 leading-relaxed">
-                      "Companai turned my scattered learning into a clear path. I went from design mockups to deploying real apps in just 8 weeks!"
+                      "I had an idea for a fitness tracking app but zero coding skills. Companai gave me the exact prompts I needed. My app was live in 3 days!"
                     </blockquote>
                     <div className="flex flex-col md:flex-row md:items-center gap-6">
                       <div>
                         <p className="text-xl font-bold text-gray-900">Sarah Chen</p>
-                        <p className="text-purple-600 font-medium">From Designer to Full-Stack Developer</p>
+                        <p className="text-purple-600 font-medium">Built FitTrack Pro - 1,000+ Users</p>
                       </div>
                       <div className="flex items-center gap-6 text-sm">
                         <div className="text-center">
                           <p className="text-gray-500 mb-1">Before</p>
-                          <p className="font-medium text-gray-800">Struggling with tutorials</p>
+                          <p className="font-medium text-gray-800">Just an idea</p>
                         </div>
                         <ArrowRight className="w-6 h-6 text-purple-600" />
                         <div className="text-center">
                           <p className="text-gray-500 mb-1">After</p>
-                          <p className="font-medium text-green-600">Built 3 production apps</p>
+                          <p className="font-medium text-green-600">Live app with users</p>
                         </div>
                       </div>
                     </div>
@@ -196,10 +254,10 @@ const Landing = () => {
         <div className="max-w-4xl mx-auto">
           <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-blue-600 rounded-3xl p-16 text-white shadow-2xl">
             <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              Ready to Transform Your Future?
+              Ready to Build Your App?
             </h2>
             <p className="text-xl mb-10 opacity-90 max-w-2xl mx-auto">
-              Join thousands of builders who've already started their journey to becoming professional developers.
+              Stop waiting. Stop learning. Start building. Transform your app idea into reality with professional AI development tools.
             </p>
             
             <Link to="/signup">
@@ -211,15 +269,15 @@ const Landing = () => {
             <div className="flex flex-wrap items-center justify-center gap-8 mt-10 text-sm opacity-90">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5" />
-                <span>Free to start</span>
+                <span>No coding required</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5" />
-                <span>No credit card required</span>
+                <span>Professional results</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5" />
-                <span>Cancel anytime</span>
+                <span>24-hour turnaround</span>
               </div>
             </div>
           </div>
@@ -237,7 +295,7 @@ const Landing = () => {
               Companai
             </span>
           </div>
-          <p className="text-gray-600">© 2024 Companai. Empowering the next generation of developers.</p>
+          <p className="text-gray-600">© 2024 Companai. Accelerating app development with AI.</p>
         </div>
       </footer>
     </div>
