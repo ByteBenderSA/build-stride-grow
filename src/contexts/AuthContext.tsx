@@ -1,25 +1,21 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-  createdAt: string;
-  progress: {
-    totalProjects: number;
-    completedSteps: number;
-    currentStreak: number;
-  };
-}
+import { 
+  User,
+  signUpWithEmail,
+  signInWithEmail,
+  signInWithGoogle,
+  signOutUser,
+  onAuthStateChange
+} from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => void;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
   loading: boolean;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,67 +31,84 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for existing session
-    const savedUser = localStorage.getItem('buildflow_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChange((user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
-    setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const mockUser: User = {
-      id: 'user_' + Math.random().toString(36).substr(2, 9),
-      email,
-      name: email.split('@')[0],
-      createdAt: new Date().toISOString(),
-      progress: {
-        totalProjects: 0,
-        completedSteps: 0,
-        currentStreak: 0,
-      }
-    };
-    
-    setUser(mockUser);
-    localStorage.setItem('buildflow_user', JSON.stringify(mockUser));
-    setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const user = await signInWithEmail(email, password);
+      setUser(user);
+    } catch (err: any) {
+      setError(err.message || 'Failed to log in');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signup = async (email: string, password: string, name: string) => {
-    setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const mockUser: User = {
-      id: 'user_' + Math.random().toString(36).substr(2, 9),
-      email,
-      name,
-      createdAt: new Date().toISOString(),
-      progress: {
-        totalProjects: 0,
-        completedSteps: 0,
-        currentStreak: 0,
-      }
-    };
-    
-    setUser(mockUser);
-    localStorage.setItem('buildflow_user', JSON.stringify(mockUser));
-    setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const user = await signUpWithEmail(email, password, name);
+      setUser(user);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('buildflow_user');
+  const loginWithGoogle = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const user = await signInWithGoogle();
+      setUser(user);
+    } catch (err: any) {
+      setError(err.message || 'Failed to log in with Google');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      await signOutUser();
+      setUser(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to log out');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      signup, 
+      loginWithGoogle, 
+      logout, 
+      loading, 
+      error 
+    }}>
       {children}
     </AuthContext.Provider>
   );

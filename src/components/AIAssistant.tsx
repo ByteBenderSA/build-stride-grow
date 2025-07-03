@@ -1,34 +1,37 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Send, MessageSquare, Lightbulb, Code, HelpCircle } from "lucide-react";
+import { AlertCircle, X, Send, MessageSquare, Lightbulb, Code, HelpCircle, Bot, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { conversationService, Message as ConversationMessage } from "@/lib/conversations";
+import { geminiService, ChatMessage } from "@/lib/gemini";
+import { Timestamp } from "firebase/firestore";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AIAssistantProps {
   onClose: () => void;
 }
 
-interface Message {
+interface UIMessage {
   id: string;
   content: string;
-  type: 'user' | 'assistant';
+  role: 'user' | 'assistant';
   timestamp: Date;
+  isLoading?: boolean;
 }
 
 const AIAssistant = ({ onClose }: AIAssistantProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: "Hi! I'm your AI coding mentor. I can help you with project ideas, debugging, learning concepts, or just provide guidance. What would you like to work on today?",
-      type: 'assistant',
-      timestamp: new Date()
-    }
-  ]);
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<UIMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   const quickSuggestions = [
     { icon: Lightbulb, text: "Give me a project idea", color: "bg-yellow-100 text-yellow-700" },
@@ -36,57 +39,168 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
     { icon: HelpCircle, text: "Explain React hooks", color: "bg-green-100 text-green-700" },
   ];
 
+  // Initialize conversation
+  useEffect(() => {
+    const initializeConversation = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Create a new conversation
+        const newConversationId = await conversationService.createConversation(user, 'AI Chat Session');
+        setConversationId(newConversationId);
+        
+        // Add welcome message
+        await conversationService.addMessage(
+          newConversationId,
+          "Hi! I'm your AI coding mentor. I can help you with project ideas, debugging, learning concepts, or just provide guidance. What would you like to work on today?",
+          'assistant',
+          { aiModel: 'gemini-2.0-flash' }
+        );
+        
+        setIsInitialized(true);
+      } catch (err) {
+        console.error('Error initializing conversation:', err);
+        setError('Failed to initialize chat. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeConversation();
+  }, [user]);
+
+  // Subscribe to messages
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const unsubscribe = conversationService.subscribeToMessages(
+      conversationId,
+      (firestoreMessages: ConversationMessage[]) => {
+        const uiMessages: UIMessage[] = firestoreMessages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role,
+          timestamp: msg.timestamp ? msg.timestamp.toDate() : new Date()
+        }));
+        setMessages(uiMessages);
+      }
+    );
+
+    unsubscribeRef.current = unsubscribe;
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, [conversationId]);
+
+  // Auto-scroll to bottom
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const handleSendMessage = async (content: string) => {
-    if (!content.trim()) return;
+    if (!content.trim() || !conversationId || !user || isLoading) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content,
-      type: 'user',
-      timestamp: new Date()
-    };
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue("");
-    setIsTyping(true);
+      // Analyze user message for metadata
+      const messageAnalysis = await geminiService.analyzeUserMessage(content);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "That's a great question! Let me help you with that. For React development, I'd recommend starting with understanding component state and props. Would you like me to explain these concepts?",
-        "I can definitely help you with that project idea! Based on what you're interested in, I suggest building a task management app. It's perfect for learning CRUD operations and state management.",
-        "For debugging, the first step is to check the browser console for any error messages. Can you share the specific error you're encountering?",
-        "That's an excellent learning goal! I recommend breaking it down into smaller steps. What specific aspect would you like to focus on first?",
-      ];
+      // Add user message to Firestore
+      await conversationService.addMessage(
+        conversationId,
+        content,
+        'user',
+        {
+          intent: messageAnalysis.intent,
+          topics: messageAnalysis.topics
+        }
+      );
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: responses[Math.floor(Math.random() * responses.length)],
-        type: 'assistant',
-        timestamp: new Date()
-      };
+      // Update conversation title if this is the first user message
+      const messageCount = messages.filter(m => m.role === 'user').length;
+      if (messageCount === 0) {
+        await conversationService.updateConversationTitle(conversationId, content);
+      }
 
-      setMessages(prev => [...prev, assistantMessage]);
-      setIsTyping(false);
-    }, 1500);
+      // Get recent messages for context
+      const recentMessages = await conversationService.getRecentMessagesForContext(conversationId);
+      
+      // Convert to ChatMessage format for Gemini
+      const chatMessages: ChatMessage[] = recentMessages.map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: msg.content
+      }));
+
+      // Get conversation context
+      const conversation = await conversationService.getConversation(conversationId);
+      const context = conversation?.context;
+
+      // Generate AI response
+      const aiResponse = await geminiService.generateResponse(chatMessages, context);
+
+      // Add AI response to Firestore
+      await conversationService.addMessage(
+        conversationId,
+        aiResponse,
+        'assistant',
+        {
+          aiModel: 'gemini-2.0-flash',
+          topics: messageAnalysis.topics
+        }
+      );
+
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setError('Failed to send message. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    handleSendMessage(inputValue);
+    if (inputValue.trim()) {
+      handleSendMessage(inputValue);
+      setInputValue("");
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
     handleSendMessage(suggestion);
   };
+
+  if (!user) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <p>Please log in to use the AI Assistant.</p>
+            <Button onClick={onClose} className="mt-4">Close</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -107,54 +221,104 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
             </Button>
           </div>
           <Badge className="bg-white/20 text-white w-fit">
-            ✨ Always here to help
+            ✨ Powered by Gemini AI
           </Badge>
         </CardHeader>
 
         <CardContent className="flex-1 flex flex-col p-0">
+          {/* Error Alert */}
+          {error && (
+            <Alert className="m-4 border-red-200 bg-red-50">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-red-700">
+                {error}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setError(null)}
+                  className="ml-2 h-6 px-2 text-red-700 hover:bg-red-100"
+                >
+                  Dismiss
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
-                    message.type === 'user'
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.type === 'user' ? 'text-white/70' : 'text-gray-500'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString([], { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </p>
+            {!isInitialized ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-2"></div>
+                  <p className="text-gray-500">Initializing AI Assistant...</p>
                 </div>
               </div>
-            ))}
-
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 text-gray-800 max-w-[80%] p-3 rounded-lg">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            ) : (
+              <>
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`flex gap-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      {/* Avatar */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        message.role === 'user' 
+                          ? 'bg-gradient-to-r from-purple-600 to-blue-600' 
+                          : 'bg-gray-200'
+                      }`}>
+                        {message.role === 'user' ? (
+                          <User className="w-4 h-4 text-white" />
+                        ) : (
+                          <Bot className="w-4 h-4 text-gray-600" />
+                        )}
+                      </div>
+                      
+                      {/* Message */}
+                      <div
+                        className={`p-3 rounded-lg ${
+                          message.role === 'user'
+                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p className={`text-xs mt-1 ${
+                          message.role === 'user' ? 'text-white/70' : 'text-gray-500'
+                        }`}>
+                          {message.timestamp.toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                ))}
+
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="flex gap-2 max-w-[80%]">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                        <Bot className="w-4 h-4 text-gray-600" />
+                      </div>
+                      <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Suggestions */}
-          {messages.length === 1 && (
+          {/* Quick Suggestions - show only if there's just the welcome message */}
+          {messages.length === 1 && !isLoading && (
             <div className="p-4 border-t bg-gray-50">
               <p className="text-sm text-gray-600 mb-3">Quick suggestions:</p>
               <div className="flex flex-wrap gap-2">
@@ -165,6 +329,7 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
                     size="sm"
                     onClick={() => handleSuggestionClick(suggestion.text)}
                     className="text-xs"
+                    disabled={isLoading}
                   >
                     <suggestion.icon className="w-3 h-3 mr-1" />
                     {suggestion.text}
@@ -182,11 +347,11 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Ask me anything about coding..."
                 className="flex-1"
-                disabled={isTyping}
+                disabled={isLoading || !isInitialized}
               />
               <Button
                 type="submit"
-                disabled={!inputValue.trim() || isTyping}
+                disabled={!inputValue.trim() || isLoading || !isInitialized}
                 className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               >
                 <Send className="w-4 h-4" />

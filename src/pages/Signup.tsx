@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,16 +18,18 @@ const Signup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log('🔍 Attempting signup with:', { email, name, passwordLength: password.length });
       await signup(email, password, name);
       toast({
         title: "Welcome to BuildFlow!",
         description: "Your account has been created successfully.",
       });
       navigate("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
+      console.error('❌ Signup error:', error);
       toast({
         title: "Signup failed",
-        description: "Something went wrong. Please try again.",
+        description: `Error: ${error.message || 'Something went wrong. Please try again.'}`,
         variant: "destructive",
       });
     }

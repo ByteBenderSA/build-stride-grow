@@ -1,0 +1,191 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Initialize Gemini AI
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBeJKlD6c-_-Kcv0_UJ3cP8Vl2VgiUiaD0';
+
+if (!API_KEY) {
+  throw new Error('Gemini API key is required. Please set VITE_GEMINI_API_KEY environment variable.');
+}
+
+const genAI = new GoogleGenerativeAI(API_KEY);
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  parts: string;
+}
+
+export interface ConversationContext {
+  userProgress?: string;
+  currentProject?: string;
+  lastTopics?: string[];
+  skillLevel?: 'beginner' | 'intermediate' | 'advanced';
+}
+
+class GeminiService {
+  private model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  private readonly SYSTEM_PROMPT = `You are an expert AI coding mentor for BuildFlow, a platform that helps complete beginners learn to code through building real projects. Your role is to:
+
+1. **Be encouraging and supportive** - Remember users are complete beginners
+2. **Provide actionable guidance** - Give specific, step-by-step instructions
+3. **Focus on practical learning** - Emphasize building projects over theory
+4. **Recommend tools** - Suggest Lovable.dev for rapid prototyping, Cursor for coding, Firebase for backend
+5. **Be patient** - Explain concepts simply without being condescending
+6. **Ask clarifying questions** - Help users narrow down their goals
+7. **Provide project ideas** - Suggest beginner-friendly projects that teach important concepts
+
+Guidelines:
+- Keep responses conversational and friendly
+- Use simple language and avoid jargon when possible
+- If using technical terms, briefly explain them
+- Provide code examples when helpful
+- Suggest next steps after each interaction
+- Remember the user's context and previous conversations
+
+Current conversation context will be provided with each message.`;
+
+  async generateResponse(
+    messages: ChatMessage[],
+    context?: ConversationContext
+  ): Promise<string> {
+    try {
+      // Build context-aware prompt
+      let contextPrompt = this.SYSTEM_PROMPT;
+      
+      if (context) {
+        contextPrompt += `\n\nUser Context:`;
+        if (context.skillLevel) {
+          contextPrompt += `\n- Skill Level: ${context.skillLevel}`;
+        }
+        if (context.currentProject) {
+          contextPrompt += `\n- Current Project: ${context.currentProject}`;
+        }
+        if (context.userProgress) {
+          contextPrompt += `\n- Progress: ${context.userProgress}`;
+        }
+        if (context.lastTopics && context.lastTopics.length > 0) {
+          contextPrompt += `\n- Recent Topics: ${context.lastTopics.join(', ')}`;
+        }
+      }
+
+      // Format chat history for Gemini
+      const chatHistory = messages.map(msg => ({
+        role: msg.role,
+        parts: [{ text: msg.parts }]
+      }));
+
+      // Add system prompt as the first message
+      const fullHistory = [
+        {
+          role: 'user' as const,
+          parts: [{ text: contextPrompt }]
+        },
+        {
+          role: 'model' as const,
+          parts: [{ text: 'I understand my role as your AI coding mentor. I\'m here to help you learn coding through building real projects. What would you like to work on today?' }]
+        },
+        ...chatHistory
+      ];
+
+      // Generate response
+      const chat = this.model.startChat({
+        history: fullHistory,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.8,
+          maxOutputTokens: 1000,
+        },
+      });
+
+      const lastMessage = messages[messages.length - 1];
+      const result = await chat.sendMessage(lastMessage.parts);
+      
+      return result.response.text();
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      throw new Error('Failed to generate response. Please try again.');
+    }
+  }
+
+  async generateProjectIdea(userInterests?: string, skillLevel?: string): Promise<string> {
+    try {
+      const prompt = `Generate a beginner-friendly project idea for someone learning to code. 
+      ${userInterests ? `User interests: ${userInterests}` : ''}
+      ${skillLevel ? `Skill level: ${skillLevel}` : 'Assume complete beginner'}
+      
+      Provide:
+      1. Project name and brief description
+      2. Key learning objectives (3-4 skills they'll gain)
+      3. Suggested tech stack (keep it simple)
+      4. Brief implementation roadmap (3-5 major steps)
+      
+      Make it encouraging and achievable for a beginner!`;
+
+      const result = await this.model.generateContent(prompt);
+      return result.response.text();
+    } catch (error) {
+      console.error('Error generating project idea:', error);
+      throw new Error('Failed to generate project idea. Please try again.');
+    }
+  }
+
+  async analyzeUserMessage(message: string): Promise<{
+    intent: 'question' | 'help_request' | 'project_idea' | 'debug_help' | 'general';
+    topics: string[];
+    urgency: 'low' | 'medium' | 'high';
+  }> {
+    try {
+      const prompt = `Analyze this user message and extract:
+      1. Intent (question, help_request, project_idea, debug_help, or general)
+      2. Key topics mentioned (as array)
+      3. Urgency level (low, medium, high)
+      
+      Message: "${message}"
+      
+      Respond in JSON format only.`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = result.response.text();
+      
+      // Parse JSON response
+      try {
+        return JSON.parse(response);
+      } catch {
+        // Fallback if JSON parsing fails
+        return {
+          intent: 'general' as const,
+          topics: [],
+          urgency: 'medium' as const
+        };
+      }
+    } catch (error) {
+      console.error('Error analyzing message:', error);
+      return {
+        intent: 'general' as const,
+        topics: [],
+        urgency: 'medium' as const
+      };
+    }
+  }
+
+  async generateLongFormPrompt(prompt: string): Promise<string> {
+    try {
+      const result = await this.model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.8,
+          maxOutputTokens: 4000, // Higher limit for long prompts
+        },
+      });
+      
+      return result.response.text();
+    } catch (error) {
+      console.error('Error generating long form prompt:', error);
+      throw new Error('Failed to generate prompt. Please try again.');
+    }
+  }
+}
+
+export const geminiService = new GeminiService(); 

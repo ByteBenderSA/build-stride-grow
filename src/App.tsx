@@ -9,6 +9,7 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import IdeaWorkshop from "./pages/IdeaWorkshop";
 import Workspace from "./pages/Workspace";
+import Lessons from "./pages/Lessons";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -40,6 +41,11 @@ const App = () => (
             <Route path="/workspace" element={
               <ProtectedRoute>
                 <Workspace />
+              </ProtectedRoute>
+            } />
+            <Route path="/lessons" element={
+              <ProtectedRoute>
+                <Lessons />
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />
