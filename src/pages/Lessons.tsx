@@ -527,23 +527,80 @@ const Lessons = () => {
                   </div>
                 </section>
 
-                {/* Complete Lesson Button */}
-                <div className="flex justify-center pt-6">
-                  {completedLessons.includes(selectedLesson.id) ? (
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle className="w-5 h-5" />
-                      <span className="font-medium">Lesson Completed!</span>
-                    </div>
-                  ) : (
-                    <Button 
-                      onClick={() => completeLesson(selectedLesson.id)}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                      size="lg"
-                    >
-                      <CheckCircle className="w-5 h-5 mr-2" />
-                      Mark as Complete
-                    </Button>
-                  )}
+                {/* Complete Lesson & Navigation */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6">
+                  {/* Previous Lesson */}
+                  <div>
+                    {(() => {
+                      const currentIndex = TECH_LESSONS.findIndex(l => l.id === selectedLesson.id);
+                      const previousLesson = currentIndex > 0 ? TECH_LESSONS[currentIndex - 1] : null;
+                      
+                      return previousLesson ? (
+                        <Button 
+                          variant="outline"
+                          onClick={() => setSelectedLesson(previousLesson)}
+                          className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                        >
+                          ← Previous: {previousLesson.title.split(' - ')[0]}
+                        </Button>
+                      ) : <div></div>;
+                    })()}
+                  </div>
+
+                  {/* Complete Button */}
+                  <div className="flex justify-center">
+                    {completedLessons.includes(selectedLesson.id) ? (
+                      <div className="flex items-center gap-2 text-green-600">
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="font-medium">Lesson Completed!</span>
+                      </div>
+                    ) : (
+                      <Button 
+                        onClick={() => {
+                          completeLesson(selectedLesson.id);
+                          // Auto-navigate to next lesson after completion
+                          const currentIndex = TECH_LESSONS.findIndex(l => l.id === selectedLesson.id);
+                          const nextLesson = currentIndex < TECH_LESSONS.length - 1 ? TECH_LESSONS[currentIndex + 1] : null;
+                          if (nextLesson) {
+                            setTimeout(() => {
+                              setSelectedLesson(nextLesson);
+                            }, 1500);
+                          }
+                        }}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                        size="lg"
+                      >
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Mark as Complete
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Next Lesson */}
+                  <div>
+                    {(() => {
+                      const currentIndex = TECH_LESSONS.findIndex(l => l.id === selectedLesson.id);
+                      const nextLesson = currentIndex < TECH_LESSONS.length - 1 ? TECH_LESSONS[currentIndex + 1] : null;
+                      
+                      return nextLesson ? (
+                        <Button 
+                          onClick={() => setSelectedLesson(nextLesson)}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                        >
+                          Next: {nextLesson.title.split(' - ')[0]} →
+                        </Button>
+                      ) : (
+                        completedLessons.includes(selectedLesson.id) && (
+                          <Button 
+                            onClick={() => setSelectedLesson(null)}
+                            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                          >
+                            🎉 All Done! →
+                          </Button>
+                        )
+                      );
+                    })()}
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -1265,6 +1265,11 @@ Live: https://${projectSlug}.web.app
         // Get the most recent project that's not completed
         const activeProject = projects.find(p => p.status !== 'completed') || projects[0];
         setCurrentProject(activeProject || null);
+        
+        // If no projects exist, we're not really loading anymore
+        if (projects.length === 0) {
+          setLoading(false);
+        }
       } catch (error) {
         console.error('Error fetching projects:', error);
       } finally {
@@ -1325,6 +1330,81 @@ Live: https://${projectSlug}.web.app
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p>Loading your workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show project creation prompt if no projects exist
+  if (!currentProject) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+        {/* Header */}
+        <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
+          <div className="container mx-auto px-6 py-4">
+            <Link to="/dashboard" className="flex items-center text-purple-600 hover:text-purple-700 mb-2">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Link>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                <Code className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Workspace</h1>
+                <p className="text-gray-600">Ready to build your first project?</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="container mx-auto px-6 py-16">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <PlayCircle className="w-12 h-12 text-white" />
+            </div>
+            
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Let's Create Your First Project!
+            </h2>
+            
+            <p className="text-xl text-gray-600 mb-8">
+              You haven't created any projects yet. Start by generating some ideas or create a custom project to begin your development journey.
+            </p>
+            
+            <div className="space-y-4">
+              <Link to="/idea-workshop">
+                <Button 
+                  size="lg" 
+                  className="w-full md:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
+                >
+                  🚀 Generate Project Ideas
+                </Button>
+              </Link>
+              
+              <div className="text-gray-500">or</div>
+              
+              <Link to="/dashboard">
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  className="w-full md:w-auto border-purple-200 text-purple-700 hover:bg-purple-50 px-8 py-6"
+                >
+                  <Book className="w-5 h-5 mr-2" />
+                  Explore Learning Resources
+                </Button>
+              </Link>
+            </div>
+            
+            <div className="mt-12 bg-blue-50 rounded-lg p-6 border border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-2">💡 Quick Start Tips:</h3>
+              <ul className="text-blue-800 text-sm space-y-1">
+                <li>• Start with the AI Idea Workshop to get personalized project suggestions</li>
+                <li>• Check out our Learning Resources to understand the development tools</li>
+                <li>• Each project comes with step-by-step guidance and AI assistance</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -1491,19 +1571,49 @@ Live: https://${projectSlug}.web.app
                         <div className="space-y-4">
                           <h3 className="text-lg font-semibold">Helpful Resources:</h3>
                           <div className="grid gap-3">
-                            {step.content.resources.map((resource, index) => (
-                              <Card key={index} className="hover:shadow-md transition-shadow">
-                                <CardContent className="p-4 flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <Book className="w-5 h-5 text-blue-600" />
-                                    <span className="font-medium">{resource}</span>
-                                  </div>
-                                  <Button size="sm" variant="ghost">
-                                    <ExternalLink className="w-4 h-4" />
-                                  </Button>
-                                </CardContent>
-                              </Card>
-                            ))}
+                            {step.content.resources.map((resource, index) => {
+                              // Define resource URLs
+                              const resourceUrls: { [key: string]: string } = {
+                                "Lovable.dev Platform": "https://lovable.dev",
+                                "Tailwind CSS Documentation": "https://tailwindcss.com/docs",
+                                "shadcn/ui Components": "https://ui.shadcn.com",
+                                "React TypeScript Guide": "https://react-typescript-cheatsheet.netlify.app",
+                                "Mobile-First Design Principles": "https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Responsive/Mobile_first",
+                                "Cursor AI Documentation": "https://docs.cursor.sh",
+                                "Firebase Integration Guide": "https://firebase.google.com/docs/web/setup",
+                                "TypeScript Best Practices": "https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html",
+                                "React Performance Tips": "https://react.dev/learn/render-and-commit",
+                                "Production Deployment Checklist": "https://create-react-app.dev/docs/deployment/",
+                                "Firebase Hosting Guide": "https://firebase.google.com/docs/hosting",
+                                "Custom Domain Setup": "https://firebase.google.com/docs/hosting/custom-domain",
+                                "Performance Optimization": "https://web.dev/performance-scoring/",
+                                "Portfolio Best Practices": "https://www.freecodecamp.org/news/15-web-developer-portfolios-to-inspire-you-137fb1743cae/",
+                                "Developer Resume Tips": "https://www.freecodecamp.org/news/how-to-write-a-resume-that-works/"
+                              };
+                              
+                              const url = resourceUrls[resource] || `https://www.google.com/search?q=${encodeURIComponent(resource)}`;
+                              
+                              return (
+                                <Card key={index} className="hover:shadow-md transition-shadow">
+                                  <CardContent className="p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <Book className="w-5 h-5 text-blue-600" />
+                                      <span className="font-medium">{resource}</span>
+                                    </div>
+                                    <a 
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex"
+                                    >
+                                      <Button size="sm" variant="ghost" className="hover:bg-blue-50">
+                                        <ExternalLink className="w-4 h-4" />
+                                      </Button>
+                                    </a>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
                           </div>
                         </div>
                       </TabsContent>

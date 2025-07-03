@@ -107,21 +107,82 @@ Current conversation context will be provided with each message.`;
     }
   }
 
-  async generateProjectIdea(userInterests?: string, skillLevel?: string): Promise<string> {
+  async generateProjectIdea(userInput?: string, skillLevel?: string): Promise<string> {
     try {
-      const prompt = `Generate a beginner-friendly project idea for someone learning to code. 
-      ${userInterests ? `User interests: ${userInterests}` : ''}
-      ${skillLevel ? `Skill level: ${skillLevel}` : 'Assume complete beginner'}
-      
-      Provide:
-      1. Project name and brief description
-      2. Key learning objectives (3-4 skills they'll gain)
-      3. Suggested tech stack (keep it simple)
-      4. Brief implementation roadmap (3-5 major steps)
-      
-      Make it encouraging and achievable for a beginner!`;
+      const prompt = `You are an expert product analyst and technical architect. Your job is to take a user's app idea and create 3 unique, innovative project variations that TRULY REFLECT their specific vision.
 
-      const result = await this.model.generateContent(prompt);
+CRITICAL INSTRUCTION: DO NOT default to common app patterns like "flashcard apps" or generic CRUD apps. Instead, deeply analyze what the user is actually trying to achieve and build on THEIR innovative concepts.
+
+User's App Vision:
+${userInput || 'No specific input provided'}
+
+Skill Level: ${skillLevel || 'Beginner'}
+
+ANALYSIS FRAMEWORK:
+1. **Extract Core Innovation**: What makes this idea unique? What's the main value proposition?
+2. **Identify Key Interactions**: How do users actually engage with the app? What's the primary experience?
+3. **Technical Challenges**: What are the interesting technical aspects that make this worth building?
+4. **User Journey**: Map out the specific user flows that deliver value
+
+GENERATION RULES:
+- Build 3 variations that honor the user's ACTUAL vision
+- Each should be a different approach to solving the SAME core problem
+- Include the innovative features they mentioned, don't simplify to basic patterns
+- If they mention AI conversation, focus on conversational interfaces
+- If they mention file processing, include smart content analysis
+- If they mention tutoring, focus on personalized learning experiences
+
+Return 3 ideas separated by "---" in this EXACT JSON format for each:
+
+{
+  "title": "[Specific descriptive name that reflects their vision]",
+  "description": "[2-3 sentences capturing their EXACT use case and value proposition]",
+  "features": [
+    "[Feature 1: Specific to their idea]",
+    "[Feature 2: Technical innovation they mentioned]", 
+    "[Feature 3: Core user interaction they described]",
+    "[Feature 4: Smart/AI feature if mentioned]",
+    "[Feature 5: User management/progress tracking]",
+    "[Feature 6: Advanced feature that extends their vision]"
+  ],
+  "techStack": [
+    "React",
+    "TypeScript",
+    "Tailwind CSS", 
+    "Firebase",
+    "[AI API mentioned or similar]",
+    "[Additional tech for their specific features]"
+  ],
+  "difficulty": "Beginner",
+  "learningObjectives": [
+    "[Skill directly related to their app's features]",
+    "[Technical concept they'll learn from their use case]",
+    "[Integration skill for their specific APIs/services]",
+    "[UI/UX skill relevant to their interface]"
+  ],
+  "timeEstimate": "2-4 weeks",
+  "marketPotential": "Medium"
+}
+
+IMPORTANT: 
+- Honor their SPECIFIC vision, don't generic-ify it
+- If they want conversational AI, make it conversational AI, not flashcards
+- If they want file processing, include actual file processing features
+- Focus on what makes THEIR idea innovative and valuable
+- Each variation should be a different technical approach to their same goal
+
+Generate 3 distinct variations now:`;
+
+      const result = await this.model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.8,
+          topK: 40,
+          topP: 0.9,
+          maxOutputTokens: 3000,
+        },
+      });
+      
       return result.response.text();
     } catch (error) {
       console.error('Error generating project idea:', error);

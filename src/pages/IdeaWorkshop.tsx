@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { 
   Lightbulb, 
   ArrowLeft, 
@@ -21,7 +22,10 @@ import {
   AlertCircle,
   Loader2,
   Rocket,
-  Star
+  Star,
+  Brain,
+  Sparkles,
+  Zap
 } from "lucide-react";
 import { geminiService } from "@/lib/gemini";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +46,170 @@ interface GeneratedIdea {
   projectId?: string;
 }
 
+// Enhanced Loading Component
+const IdeaGenerationLoader = () => {
+  const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  
+  const steps = [
+    { icon: Brain, text: "Analyzing your interests...", duration: 1500 },
+    { icon: Sparkles, text: "Generating creative concepts...", duration: 2000 },
+    { icon: Code, text: "Designing technical architecture...", duration: 1800 },
+    { icon: Target, text: "Calculating market potential...", duration: 1200 },
+    { icon: Zap, text: "Finalizing perfect matches...", duration: 1000 }
+  ];
+
+  const tips = [
+    "💡 The best apps solve real problems for real people",
+    "🚀 Start simple, then add complexity as you learn",
+    "📱 Mobile-first thinking leads to better user experiences",
+    "🎯 Focus on one core feature that works perfectly",
+    "💪 Every expert was once a beginner - you've got this!"
+  ];
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress(prev => {
+        const newProgress = prev + 2;
+        
+        // Update current step based on progress
+        const stepIndex = Math.floor((newProgress / 100) * steps.length);
+        setCurrentStep(Math.min(stepIndex, steps.length - 1));
+        
+        return Math.min(newProgress, 100);
+      });
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const currentStepData = steps[currentStep];
+  const CurrentIcon = currentStepData?.icon || Brain;
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <Card className="shadow-xl border-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white">
+          <div className="text-center mb-4">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <CurrentIcon className="w-8 h-8 text-white" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Creating Your Perfect Project Ideas</h3>
+            <p className="text-purple-100">Our AI is analyzing your preferences to generate personalized suggestions</p>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span>Progress</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <Progress value={progress} className="h-2 bg-white/20" />
+          </div>
+        </div>
+        
+        <CardContent className="p-6">
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <CurrentIcon className="w-5 h-5 text-purple-600 animate-bounce" />
+              <span className="font-medium text-gray-900">{currentStepData?.text}</span>
+            </div>
+          </div>
+
+          {/* Loading Steps */}
+          <div className="space-y-3 mb-6">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = index === currentStep;
+              const isCompleted = index < currentStep;
+              
+              return (
+                <div key={index} className={`flex items-center gap-3 p-2 rounded-lg transition-all ${
+                  isActive ? 'bg-purple-50 border border-purple-200' : 
+                  isCompleted ? 'bg-green-50' : 'bg-gray-50'
+                }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    isActive ? 'bg-purple-600 text-white animate-pulse' :
+                    isCompleted ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-600'
+                  }`}>
+                    {isCompleted ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : (
+                      <Icon className="w-4 h-4" />
+                    )}
+                  </div>
+                  <span className={`text-sm ${
+                    isActive ? 'text-purple-900 font-medium' :
+                    isCompleted ? 'text-green-900' : 'text-gray-600'
+                  }`}>
+                    {step.text}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tips */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">Pro Tip</h4>
+                <p className="text-sm text-blue-800">{tips[currentStep % tips.length]}</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Skeleton Card Component
+const IdeaCardSkeleton = () => (
+  <Card className="shadow-lg border-0 animate-pulse">
+    <CardContent className="p-6">
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex-1">
+          <div className="h-6 bg-gray-200 rounded mb-2 w-3/4"></div>
+          <div className="h-4 bg-gray-200 rounded mb-4 w-full"></div>
+        </div>
+        <div className="h-6 bg-gray-200 rounded w-20"></div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <div className="h-4 bg-gray-200 rounded"></div>
+        <div className="h-4 bg-gray-200 rounded"></div>
+        <div className="h-4 bg-gray-200 rounded"></div>
+      </div>
+
+      <div className="mb-4">
+        <div className="h-4 bg-gray-200 rounded mb-2 w-24"></div>
+        <div className="flex flex-wrap gap-2">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="h-6 bg-gray-200 rounded w-16"></div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <div className="h-4 bg-gray-200 rounded mb-2 w-32"></div>
+        <div className="grid grid-cols-2 gap-2">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="h-4 bg-gray-200 rounded"></div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-gray-100 p-4 rounded-lg mb-4">
+        <div className="h-4 bg-gray-200 rounded mb-2 w-32"></div>
+        <div className="h-3 bg-gray-200 rounded w-full"></div>
+      </div>
+
+      <div className="h-10 bg-gray-200 rounded w-full"></div>
+    </CardContent>
+  </Card>
+);
+
 const IdeaWorkshop = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -49,10 +217,13 @@ const IdeaWorkshop = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    interests: "",
+    appName: "",
+    appDescription: "",
+    targetAudience: "",
+    keyFeatures: "",
+    userFlow: "",
     experience: "",
-    timeCommitment: "",
-    goals: ""
+    timeCommitment: ""
   });
   const [generatedIdeas, setGeneratedIdeas] = useState<GeneratedIdea[]>([]);
   const [selectedIdea, setSelectedIdea] = useState<GeneratedIdea | null>(null);
@@ -198,111 +369,93 @@ const IdeaWorkshop = () => {
     }
 
     // Smart feature generation based on title keywords
+    const keywords = title.toLowerCase();
     let features = fallbackIdea.features;
-    const titleLower = title.toLowerCase();
-    if (titleLower.includes('mood') || titleLower.includes('wellness') || titleLower.includes('mental')) {
-      features = ['Daily Mood Logging', 'Emotion Tracking', 'Wellness Insights', 'Progress Visualization', 'Data Export', 'Calendar View'];
-    } else if (titleLower.includes('recipe') || titleLower.includes('food') || titleLower.includes('cooking')) {
-      features = ['Recipe Storage', 'Ingredient Management', 'Meal Planning', 'Cooking Timer', 'Nutrition Tracking', 'Shopping Lists'];
-    } else if (titleLower.includes('expense') || titleLower.includes('budget') || titleLower.includes('finance')) {
-      features = ['Expense Tracking', 'Budget Planning', 'Category Management', 'Financial Reports', 'Goal Setting', 'Data Visualization'];
+    
+    if (keywords.includes('fitness') || keywords.includes('health')) {
+      features = ["Workout Tracking", "Progress Analytics", "Goal Setting", "Exercise Library", "Social Sharing", "Nutrition Logging"];
+    } else if (keywords.includes('task') || keywords.includes('todo') || keywords.includes('productivity')) {
+      features = ["Task Creation", "Due Date Reminders", "Priority Levels", "Categories", "Progress Tracking", "Team Collaboration"];
+    } else if (keywords.includes('social') || keywords.includes('chat') || keywords.includes('community')) {
+      features = ["User Profiles", "Real-time Messaging", "Friend System", "Content Sharing", "Notifications", "Privacy Controls"];
     }
 
     return {
-      ...fallbackIdea,
       id: index + 1,
       title,
       description,
-      features
+      difficulty: 'Beginner' as const,
+      timeEstimate: "2-3 weeks",
+      techStack: ["React", "TypeScript", "Tailwind CSS", "Firebase"],
+      marketPotential: "Medium",
+      features,
+      why: `Perfect for learning ${keywords.includes('mobile') ? 'mobile development' : 'web development'}`,
+      learningObjectives: ["React Components", "State Management", "Database Integration", "UI/UX Design"],
+      roadmap: ["Project Setup", "User Interface", "Backend Integration", "Testing & Polish", "Deployment"]
     };
   };
 
   const handleGenerateIdeas = async () => {
-    if (!user) {
-      setError("Please log in to generate project ideas");
-      return;
-    }
+    if (!formData.appName.trim()) return;
 
     setIsGenerating(true);
     setError(null);
+    setStep(2);
 
     try {
-      // Prepare user context for AI
       const userInput = `
-        Interests: ${formData.interests}
+        App Name: ${formData.appName}
+        App Description: ${formData.appDescription}
+        Target Audience: ${formData.targetAudience}
+        Key Features: ${formData.keyFeatures}
+        User Flow: ${formData.userFlow}
         Experience Level: ${formData.experience}
         Time Commitment: ${formData.timeCommitment}
-        Goals: ${formData.goals}
-      `.trim();
+      `;
 
-      // Generate multiple ideas
-      const ideaPromises = Array.from({ length: 3 }, async (_, index) => {
-        const prompt = `Generate a unique, creative project idea for someone learning to code.
+             const response = await geminiService.generateProjectIdea(userInput);
+       console.log('Raw Gemini Response:', response);
 
-User Context:
-${userInput}
+       // Parse the ideas from the response
+       const ideas = response.split('---').map((ideaText, index) => 
+         parseAIResponse(ideaText.trim(), index)
+       ).filter(idea => idea.title && idea.description);
 
-CRITICAL INSTRUCTION: Return ONLY valid JSON. No explanations, no markdown, no extra text, no code blocks, no \`\`\`json tags. Just pure JSON starting with { and ending with }.
+      // Ensure we have at least 3 ideas
+      const finalIdeas = ideas.length >= 3 ? ideas.slice(0, 3) : [
+        ...ideas,
+        ...Array(3 - ideas.length).fill(null).map((_, index) => ({
+          id: ideas.length + index + 1,
+          title: `Custom Project ${ideas.length + index + 1}`,
+          description: "A tailored project based on your interests and skill level.",
+          difficulty: 'Beginner' as const,
+          timeEstimate: "2-3 weeks",
+          techStack: ["React", "TypeScript", "Tailwind CSS", "Firebase"],
+          marketPotential: "Medium",
+          features: ["User Interface", "Data Management", "User Authentication", "Responsive Design"],
+          why: "Perfect for building practical development skills",
+          learningObjectives: ["React Development", "Database Integration", "UI/UX Design"],
+          roadmap: ["Setup", "Development", "Testing", "Deployment"]
+        }))
+      ];
 
-Required JSON structure:
-{
-  "title": "Project Name Here",
-  "description": "2-3 sentences describing what this app does, who uses it, and why it's valuable",
-  "features": [
-    "Feature 1: Specific and actionable",
-    "Feature 2: Specific and actionable", 
-    "Feature 3: Specific and actionable",
-    "Feature 4: Specific and actionable",
-    "Feature 5: Specific and actionable",
-    "Feature 6: Specific and actionable"
-  ],
-  "techStack": [
-    "React",
-    "TypeScript", 
-    "Tailwind CSS",
-    "Firebase",
-    "One additional relevant technology"
-  ],
-  "difficulty": "Beginner",
-  "learningObjectives": [
-    "Specific skill 1",
-    "Specific skill 2", 
-    "Specific skill 3",
-    "Specific skill 4"
-  ],
-  "timeEstimate": "1-3 weeks",
-  "marketPotential": "Medium"
-}
-
-Requirements:
-- Must be achievable for ${formData.experience} skill level
-- Should be engaging and relevant to their interests: ${formData.interests}
-- Must be practical and portfolio-worthy
-- Should be different from typical tutorial projects
-- Focus on ${index === 0 ? 'web applications' : index === 1 ? 'mobile-first responsive projects' : 'full-stack applications with backend'}
-
-REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
-
-        const response = await geminiService.generateProjectIdea(prompt, formData.experience);
-        return parseAIResponse(response, index);
-      });
-
-      const ideas = await Promise.all(ideaPromises);
-      setGeneratedIdeas(ideas);
-      setStep(2);
+      setGeneratedIdeas(finalIdeas);
     } catch (err) {
       console.error('Error generating ideas:', err);
-      setError('Failed to generate project ideas. Please try again.');
+      setError('Failed to generate ideas. Please try again.');
+      setStep(1);
     } finally {
-      setIsGenerating(false);
+      // Add a minimum delay to show the loading animation
+      setTimeout(() => {
+        setIsGenerating(false);
+      }, 3000);
     }
   };
 
   const handleSelectIdea = async (idea: GeneratedIdea) => {
     if (!user) return;
-    
+
     try {
-      // Save the selected idea as a project in Firestore
       const projectId = await createProject({
         ownerId: user.id,
         title: idea.title,
@@ -321,9 +474,88 @@ REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
           lastWorkedOn: new Date().toISOString()
         },
         prompts: {
-          lovable: `Build a ${idea.title}: ${idea.description}. Features: ${idea.features.join(', ')}. Tech stack: ${idea.techStack.join(', ')}.`,
-          cursor: `Help me build a ${idea.title} with the following features: ${idea.features.join(', ')}. I'm a ${formData.experience} level developer.`,
-          firebase: `Set up Firebase for a ${idea.title} project with authentication and database for features: ${idea.features.slice(0, 3).join(', ')}.`
+          lovable: `Create a modern, responsive web application called "${idea.title}":
+
+**App Overview:** ${idea.description}
+
+**Target Users:** ${formData.targetAudience}
+
+**Core User Experience:**
+${formData.userFlow}
+
+**Essential Features to Include:**
+${idea.features.map(feature => `• ${feature}`).join('\n')}
+
+**Design Requirements:**
+• Clean, modern UI with intuitive navigation
+• Mobile-responsive design
+• Professional color scheme and typography
+• User-friendly forms and interactions
+• Loading states and feedback
+• Accessible design principles
+
+**Key Pages/Screens:**
+• Landing/welcome page
+• User authentication (login/signup)
+• Main application interface
+• User dashboard/profile
+• Settings/preferences
+
+**Technical Specs:**
+• Use React with TypeScript
+• Implement responsive design with Tailwind CSS
+• Include proper routing and navigation
+• Add form validation and error handling
+• Ensure mobile-first responsive layout
+
+Focus on creating an engaging, professional frontend that delivers excellent user experience.`,
+          
+          cursor: `I'm building "${idea.title}" - ${idea.description}
+
+**My Experience Level:** ${formData.experience}
+**Target Audience:** ${formData.targetAudience}
+
+**Application Architecture Needed:**
+${idea.features.map(feature => `• ${feature}`).join('\n')}
+
+**User Flow to Implement:**
+${formData.userFlow}
+
+**Technical Implementation Help Needed:**
+
+1. **Backend Setup & Database:**
+   - Firebase configuration and setup
+   - Database schema design for user data
+   - Authentication implementation
+   - Data security and validation rules
+
+2. **API Integration:**
+   - RESTful API design patterns
+   - Error handling and data validation
+   - Real-time data synchronization
+   - Third-party service integration
+
+3. **Frontend Logic:**
+   - State management best practices
+   - Component architecture and reusability
+   - Form handling and validation
+   - User experience optimization
+
+4. **Code Quality & Best Practices:**
+   - TypeScript implementation
+   - Code organization and file structure
+   - Testing strategies
+   - Performance optimization
+   - Security considerations
+
+**Specific Areas I Need Guidance On:**
+- Code architecture and project structure
+- Implementation of complex features
+- Best practices for ${idea.techStack.join(', ')}
+- Debugging and troubleshooting
+- Code review and optimization
+
+Please provide step-by-step guidance, code examples, and explain the reasoning behind technical decisions.`
         },
         resources: {
           links: [],
@@ -332,78 +564,157 @@ REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
         }
       });
 
-      // Store project ID for navigation
       setSelectedIdea({ ...idea, projectId });
       setStep(3);
     } catch (error) {
-      console.error('Error saving project:', error);
+      console.error('Error creating project:', error);
       setError('Failed to save project. Please try again.');
     }
   };
 
   const difficultyColors = {
-    Beginner: "bg-green-100 text-green-700",
-    Intermediate: "bg-yellow-100 text-yellow-700",
-    Advanced: "bg-red-100 text-red-700"
+    'Beginner': 'bg-green-100 text-green-700',
+    'Intermediate': 'bg-yellow-100 text-yellow-700', 
+    'Advanced': 'bg-red-100 text-red-700'
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
-        <div className="container mx-auto px-6 py-4">
-          <Link to="/dashboard" className="flex items-center text-purple-600 hover:text-purple-700 mb-2">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Link>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg flex items-center justify-center">
-              <Lightbulb className="w-5 h-5 text-white" />
-            </div>
+      <div className="container mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link to="/dashboard">
+              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </Link>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Idea Workshop</h1>
-              <p className="text-gray-600">Let's find your perfect project to build</p>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                AI Idea Workshop
+              </h1>
+              <p className="text-gray-600 mt-1">Transform your vision into a detailed development plan</p>
             </div>
           </div>
         </div>
-      </header>
 
-      <div className="container mx-auto px-6 py-8">
+        {error && (
+          <Alert className="mb-6 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-700">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Step 1: Input Form */}
         {step === 1 && (
           <div className="max-w-2xl mx-auto">
             <Card className="shadow-xl border-0">
-              <CardHeader className="text-center">
-                <CardTitle className="text-xl mb-2">Tell us about yourself</CardTitle>
-                <p className="text-gray-600">Help our AI understand your interests and goals</p>
+              <CardHeader className="text-center bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
+                <CardTitle className="text-2xl flex items-center justify-center gap-2">
+                  <Lightbulb className="w-6 h-6" />
+                  Tell us about your vision
+                </CardTitle>
+                <p className="mt-2 opacity-90">The more details you share, the better ideas we can generate</p>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Error Alert */}
-                {error && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="text-red-700">
-                      {error}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
+              <CardContent className="p-8 space-y-6">
                 <div>
-                  <Label htmlFor="interests">What are you interested in building?</Label>
-                  <Textarea
-                    id="interests"
-                    placeholder="e.g., social media, productivity tools, games, e-commerce..."
-                    value={formData.interests}
-                    onChange={(e) => setFormData({...formData, interests: e.target.value})}
+                  <Label htmlFor="appName" className="text-base font-semibold">
+                    App Name *
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    What's the name of your app?
+                  </p>
+                  <Input
+                    id="appName"
+                    placeholder="e.g., FitTrack, RecipeShare, LocalBizFinder, FinTrack..."
+                    value={formData.appName}
+                    onChange={(e) => setFormData({...formData, appName: e.target.value})}
                     className="mt-1"
                     disabled={isGenerating}
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="experience">What's your coding experience?</Label>
+                  <Label htmlFor="appDescription" className="text-base font-semibold">
+                    App Description *
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Describe your app in a few sentences
+                  </p>
+                  <Textarea
+                    id="appDescription"
+                    placeholder="e.g., A fitness tracking app that helps users achieve their goals..."
+                    value={formData.appDescription}
+                    onChange={(e) => setFormData({...formData, appDescription: e.target.value})}
+                    className="mt-1 min-h-[100px]"
+                    disabled={isGenerating}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="targetAudience" className="text-base font-semibold">
+                    Target Audience *
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Who are you designing this app for?
+                  </p>
+                  <Input
+                    id="targetAudience"
+                    placeholder="e.g., fitness enthusiasts, recipe lovers, local business owners, personal finance managers..."
+                    value={formData.targetAudience}
+                    onChange={(e) => setFormData({...formData, targetAudience: e.target.value})}
+                    className="mt-1"
+                    disabled={isGenerating}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="keyFeatures" className="text-base font-semibold">
+                    Key Features *
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    What are the main features of your app?
+                  </p>
+                  <Textarea
+                    id="keyFeatures"
+                    placeholder="e.g., user registration, data input, real-time updates, responsive design..."
+                    value={formData.keyFeatures}
+                    onChange={(e) => setFormData({...formData, keyFeatures: e.target.value})}
+                    className="mt-1 min-h-[100px]"
+                    disabled={isGenerating}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="userFlow" className="text-base font-semibold">
+                    User Flow *
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Describe the typical user flow of your app
+                  </p>
+                                     <Textarea
+                     id="userFlow"
+                     placeholder="e.g., 1. User signs up with email, 2. They upload a topic or ask a question, 3. AI processes and gives explanation, 4. User can review chat history..."
+                     value={formData.userFlow}
+                     onChange={(e) => setFormData({...formData, userFlow: e.target.value})}
+                     className="mt-1 min-h-[100px]"
+                     disabled={isGenerating}
+                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="experience" className="text-base font-semibold">
+                    What's your development experience?
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Help us tailor the complexity to your skill level
+                  </p>
                   <Input
                     id="experience"
-                    placeholder="e.g., Complete beginner, some HTML/CSS, React basics..."
+                    placeholder="e.g., complete beginner, some HTML/CSS, built a few projects..."
                     value={formData.experience}
                     onChange={(e) => setFormData({...formData, experience: e.target.value})}
                     className="mt-1"
@@ -412,24 +723,17 @@ REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
                 </div>
 
                 <div>
-                  <Label htmlFor="timeCommitment">How much time can you dedicate?</Label>
+                  <Label htmlFor="timeCommitment" className="text-base font-semibold">
+                    How much time can you dedicate?
+                  </Label>
+                  <p className="text-sm text-gray-600 mb-2">
+                    This helps us scope the project appropriately
+                  </p>
                   <Input
                     id="timeCommitment"
-                    placeholder="e.g., 1-2 hours per day, weekends only, full-time..."
+                    placeholder="e.g., 2-3 hours per week, evenings only, full-time..."
                     value={formData.timeCommitment}
                     onChange={(e) => setFormData({...formData, timeCommitment: e.target.value})}
-                    className="mt-1"
-                    disabled={isGenerating}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="goals">What do you want to achieve?</Label>
-                  <Textarea
-                    id="goals"
-                    placeholder="e.g., build a portfolio, start a business, learn new skills..."
-                    value={formData.goals}
-                    onChange={(e) => setFormData({...formData, goals: e.target.value})}
                     className="mt-1"
                     disabled={isGenerating}
                   />
@@ -439,12 +743,12 @@ REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
                   onClick={handleGenerateIdeas}
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                   size="lg"
-                  disabled={isGenerating || !formData.interests.trim()}
+                  disabled={isGenerating || !formData.appName.trim()}
                 >
                   {isGenerating ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating Ideas...
+                      Creating Your Ideas...
                     </>
                   ) : (
                     <>
@@ -458,6 +762,7 @@ REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
           </div>
         )}
 
+        {/* Step 2: Generated Ideas */}
         {step === 2 && (
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-8">
@@ -466,13 +771,7 @@ REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
             </div>
 
             {isGenerating ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
-                  <p className="text-lg font-medium mb-2">Generating your perfect project ideas...</p>
-                  <p className="text-gray-600">Our AI is analyzing your preferences and creating personalized suggestions</p>
-                </div>
-              </div>
+              <IdeaGenerationLoader />
             ) : (
               <div className="grid gap-6">
                 {generatedIdeas.map((idea) => (
@@ -557,6 +856,7 @@ REMEMBER: Return ONLY the JSON object. No other text whatsoever.`;
           </div>
         )}
 
+        {/* Step 3: Project Selected */}
         {step === 3 && selectedIdea && (
           <div className="max-w-3xl mx-auto">
             <Card className="shadow-xl border-0">

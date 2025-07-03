@@ -537,7 +537,8 @@ const Dashboard = () => {
       {/* Welcome Modal */}
       <WelcomeModal 
         isOpen={showWelcomeModal} 
-        onSelectPath={handleOnboardingPathSelection} 
+        onSelectPath={handleOnboardingPathSelection}
+        onClose={() => setShowWelcomeModal(false)}
       />
 
       {/* Product Tour */}
