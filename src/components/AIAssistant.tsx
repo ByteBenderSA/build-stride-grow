@@ -204,8 +204,8 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-2xl h-[600px] flex flex-col shadow-2xl">
-        <CardHeader className="border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
+      <Card className="w-full max-w-2xl h-[80vh] flex flex-col shadow-2xl">
+        <CardHeader className="border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
@@ -225,7 +225,7 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
           </Badge>
         </CardHeader>
 
-        <CardContent className="flex-1 flex flex-col p-0">
+        <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
           {/* Error Alert */}
           {error && (
             <Alert className="m-4 border-red-200 bg-red-50">
@@ -276,14 +276,16 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
                       
                       {/* Message */}
                       <div
-                        className={`p-3 rounded-lg ${
+                        className={`p-4 rounded-lg shadow-sm ${
                           message.role === 'user'
                             ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-800'
+                            : 'bg-white border border-gray-100 text-gray-800'
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                        <p className={`text-xs mt-1 ${
+                        <div className="prose prose-sm max-w-none">
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        </div>
+                        <p className={`text-xs mt-2 ${
                           message.role === 'user' ? 'text-white/70' : 'text-gray-500'
                         }`}>
                           {message.timestamp.toLocaleTimeString([], { 
@@ -302,7 +304,7 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
                       <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                         <Bot className="w-4 h-4 text-gray-600" />
                       </div>
-                      <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
+                      <div className="bg-white border border-gray-100 text-gray-800 p-4 rounded-lg shadow-sm">
                         <div className="flex items-center gap-1">
                           <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
                           <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -340,19 +342,19 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
           )}
 
           {/* Input */}
-          <div className="p-4 border-t">
+          <div className="p-4 border-t bg-gray-50">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Ask me anything about coding..."
-                className="flex-1"
+                className="flex-1 bg-white shadow-sm border-gray-200 focus-visible:ring-purple-500"
                 disabled={isLoading || !isInitialized}
               />
               <Button
                 type="submit"
                 disabled={!inputValue.trim() || isLoading || !isInitialized}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-sm"
               >
                 <Send className="w-4 h-4" />
               </Button>
