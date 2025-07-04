@@ -553,14 +553,14 @@ const IdeaWorkshop = () => {
     } finally {
       // Add a minimum delay to show the loading animation
       setTimeout(() => {
-        setIsGenerating(false);
+      setIsGenerating(false);
       }, 3000);
     }
   };
 
   const handleSelectIdea = async (idea: GeneratedIdea) => {
     if (!user) return;
-
+    
     try {
       const projectId = await createProject({
         ownerId: user.id,
@@ -687,15 +687,15 @@ Please provide step-by-step guidance, code examples, and explain the reasoning b
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
       <div className="container mx-auto px-6 py-8">
-        {/* Header */}
+      {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Link to="/dashboard">
               <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
               </Button>
-            </Link>
+          </Link>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                 AI Idea Workshop

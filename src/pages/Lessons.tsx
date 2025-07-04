@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import CelebrationModal from "@/components/ui/celebration-modal";
 import { 
   BookOpen, 
   CheckCircle, 
@@ -239,6 +240,7 @@ const Lessons = () => {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -592,7 +594,10 @@ const Lessons = () => {
                       ) : (
                         completedLessons.includes(selectedLesson.id) && (
                           <Button 
-                            onClick={() => setSelectedLesson(null)}
+                            onClick={() => {
+                              setShowCelebration(true);
+                              setSelectedLesson(null);
+                            }}
                             className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                           >
                             🎉 All Done! →
@@ -607,6 +612,12 @@ const Lessons = () => {
           </div>
         )}
       </div>
+
+      {/* Celebration Modal */}
+      <CelebrationModal 
+        isOpen={showCelebration} 
+        onClose={() => setShowCelebration(false)} 
+      />
     </div>
   );
 };
