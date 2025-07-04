@@ -163,7 +163,7 @@ const TECH_LESSONS: Lesson[] = [
         "README files are your project's first impression",
         "GitHub Pages can host your projects for free"
       ],
-      videoUrl: "https://www.youtube.com/embed/RGOj5yH7evk",
+      videoUrl: "https://www.youtube.com/embed/pBy1zgt0XPc",
       resources: [
         { title: "GitHub Hello World", url: "https://guides.github.com/activities/hello-world/" },
         { title: "Git Handbook", url: "https://guides.github.com/introduction/git-handbook/" }
