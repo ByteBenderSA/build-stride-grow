@@ -96,9 +96,12 @@ const Dashboard = () => {
     if (!user) return;
 
     // Check if user needs onboarding
-    if (needsOnboarding(user)) {
-      setShowWelcomeModal(true);
-    }
+    const checkOnboarding = async () => {
+      if (needsOnboarding(user)) {
+        setShowWelcomeModal(true);
+      }
+    };
+    checkOnboarding();
 
     // Subscribe to user's projects for real-time updates
     const unsubscribe = subscribeToUserProjects(user.id, (userProjects) => {
@@ -126,7 +129,24 @@ const Dashboard = () => {
     if (!user) return;
     
     try {
+      // Update user preferences in Firestore
       await updateUserOnboarding(user.id, path);
+      
+      // Update local user object to prevent modal from showing again
+      if (user.learningPreferences) {
+        user.learningPreferences.onboardingPath = path;
+      } else {
+        user.learningPreferences = {
+          onboardingPath: path,
+          experience: 'beginner',
+          interests: [],
+          timeCommitment: 'flexible',
+          goals: ['learn'],
+          learningStyle: 'hands-on'
+        };
+      }
+      user.onboardingCompleted = true;
+      
       setShowWelcomeModal(false);
       
       // Show product tour for beginners and "both" users
