@@ -14,6 +14,7 @@ interface YocoPaymentProps {
   planType: 'pro' | 'premium' | 'ultra';
   onSuccess: (paymentData: any) => void;
   onError: (error: string) => void;
+  onPaymentStart?: () => void;
   className?: string;
   disabled?: boolean;
 }
@@ -53,6 +54,7 @@ export const YocoPayment: React.FC<YocoPaymentProps> = ({
   planType,
   onSuccess,
   onError,
+  onPaymentStart,
   className = '',
   disabled = false
 }) => {
@@ -120,6 +122,11 @@ export const YocoPayment: React.FC<YocoPaymentProps> = ({
     }
     testPopup.close();
     console.log('✅ Popup blocker test passed');
+    
+    // Notify parent that payment is starting
+    if (onPaymentStart) {
+      onPaymentStart();
+    }
     
     setIsLoading(true);
 

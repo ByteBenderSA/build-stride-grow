@@ -42,11 +42,14 @@ const UpgradeModal = ({ isOpen, onClose, currentPlan, onUpgradeSuccess }: {
 }) => {
   const [paymentSuccess, setPaymentSuccess] = useState<string>('');
   const [paymentError, setPaymentError] = useState<string>('');
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState<boolean>(false);
 
-  if (!isOpen) return null;
+  // Hide modal when payment is processing or when not open
+  if (!isOpen || isPaymentProcessing) return null;
 
   const handlePaymentSuccess = (paymentData: any) => {
     console.log('✅ Payment successful:', paymentData);
+    setIsPaymentProcessing(false); // Allow modal to show again
     setPaymentSuccess(`Successfully upgraded to ${paymentData.planType.toUpperCase()} plan! 🎉`);
     setPaymentError('');
     
@@ -64,8 +67,16 @@ const UpgradeModal = ({ isOpen, onClose, currentPlan, onUpgradeSuccess }: {
 
   const handlePaymentError = (error: string) => {
     console.error('❌ Payment error:', error);
+    setIsPaymentProcessing(false); // Show modal again on error
     setPaymentError(error);
     setPaymentSuccess('');
+  };
+
+  // Function to handle payment start
+  const handlePaymentStart = () => {
+    console.log('🔵 Payment processing started - hiding modal');
+    setIsPaymentProcessing(true);
+    setPaymentError(''); // Clear any previous errors
   };
 
   // If payment was successful, show success screen
@@ -152,6 +163,7 @@ const UpgradeModal = ({ isOpen, onClose, currentPlan, onUpgradeSuccess }: {
                 planType="pro"
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
+                onPaymentStart={handlePaymentStart}
                 className="w-full bg-purple-600 hover:bg-purple-700"
               />
             )}
@@ -194,6 +206,7 @@ const UpgradeModal = ({ isOpen, onClose, currentPlan, onUpgradeSuccess }: {
                 planType="premium"
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
+                onPaymentStart={handlePaymentStart}
                 className="w-full bg-orange-600 hover:bg-orange-700"
               />
             )}
@@ -241,6 +254,7 @@ const UpgradeModal = ({ isOpen, onClose, currentPlan, onUpgradeSuccess }: {
                 planType="ultra"
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
+                onPaymentStart={handlePaymentStart}
                 className="w-full bg-blue-600 hover:bg-blue-700"
               />
             )}

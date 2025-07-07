@@ -28,7 +28,14 @@
       .yoco-popup-overlay,
       .yoco-popup-container,
       [id^="yc-checkout-container"] {
-        z-index: 9999 !important;
+        z-index: 999999 !important;
+      }
+      
+      /* Additional selectors for Yoco payment modals */
+      .yoco-modal,
+      .yoco-payment-form,
+      [class*="yoco"] {
+        z-index: 999999 !important;
       }
     </style>
   </head>
