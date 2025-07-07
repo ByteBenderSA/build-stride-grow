@@ -3,6 +3,7 @@ import {
   doc, 
   addDoc, 
   updateDoc, 
+  deleteDoc,
   query, 
   where, 
   orderBy, 
@@ -72,7 +73,7 @@ export class ConversationService {
     }
   }
 
-  // Add a message to a conversation
+  // Add a message with sliding window (keeps only last 10 messages)
   async addMessage(
     conversationId: string,
     content: string,
@@ -80,7 +81,27 @@ export class ConversationService {
     metadata?: { intent?: string; topics?: string[]; aiModel?: string }
   ): Promise<string> {
     try {
-      // Add message to messages subcollection
+      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+      
+      // First, check how many messages we currently have
+      const countQuery = query(messagesRef, orderBy('timestamp', 'desc'));
+      const countSnapshot = await getDocs(countQuery);
+      const currentMessageCount = countSnapshot.docs.length;
+      
+      // If we have 10 or more messages, delete the oldest ones first
+      if (currentMessageCount >= 10) {
+        const messagesToDelete = countSnapshot.docs.slice(10 - 1); // Keep 9, delete the rest
+        
+        // Delete old messages in batch
+        const deletePromises = messagesToDelete.map(messageDoc => 
+          deleteDoc(messageDoc.ref)
+        );
+        await Promise.all(deletePromises);
+        
+        console.log(`Deleted ${messagesToDelete.length} old messages to maintain sliding window`);
+      }
+      
+      // Add the new message
       const messageData = {
         conversationId,
         content,
@@ -89,7 +110,6 @@ export class ConversationService {
         metadata: metadata || {}
       };
 
-      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
       const messageDoc = await addDoc(messagesRef, messageData);
 
       // Update conversation metadata
@@ -97,7 +117,7 @@ export class ConversationService {
       await updateDoc(conversationRef, {
         lastMessage: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
         lastActivity: serverTimestamp(),
-        messageCount: await this.getMessageCount(conversationId) + 1
+        messageCount: Math.min(currentMessageCount + 1, 10) // Never exceed 10
       });
 
       // Update conversation context if it's a user message
@@ -175,22 +195,19 @@ export class ConversationService {
     });
   }
 
-  // Get recent messages for context (last 10 messages)
-  async getRecentMessagesForContext(conversationId: string): Promise<Message[]> {
+  // Get all messages (now always 10 or fewer) - this becomes our context source
+  async getMessagesForContext(conversationId: string): Promise<Message[]> {
     try {
       const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-      const q = query(
-        messagesRef,
-        orderBy('timestamp', 'desc'),
-        limit(10)
-      );
-
+      const q = query(messagesRef, orderBy('timestamp', 'asc')); // Chronological order
+      
       const snapshot = await getDocs(q);
-      return snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as Message))
-        .reverse(); // Reverse to get chronological order
+      return snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      } as Message));
     } catch (error) {
-      console.error('Error getting recent messages:', error);
+      console.error('Error getting messages:', error);
       return [];
     }
   }
@@ -198,12 +215,12 @@ export class ConversationService {
   // Update conversation context
   async updateConversationContext(
     conversationId: string,
-    contextUpdate: Partial<Conversation['context']>
+    context: Partial<Conversation['context']>
   ): Promise<void> {
     try {
       const conversationRef = doc(db, 'conversations', conversationId);
       await updateDoc(conversationRef, {
-        [`context.${Object.keys(contextUpdate)[0]}`]: Object.values(contextUpdate)[0]
+        context: context
       });
     } catch (error) {
       console.error('Error updating conversation context:', error);
@@ -225,18 +242,6 @@ export class ConversationService {
     } catch (error) {
       console.error('Error getting conversation:', error);
       return null;
-    }
-  }
-
-  // Helper method to get message count
-  private async getMessageCount(conversationId: string): Promise<number> {
-    try {
-      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
-      const snapshot = await getDocs(messagesRef);
-      return snapshot.size;
-    } catch (error) {
-      console.error('Error getting message count:', error);
-      return 0;
     }
   }
 

@@ -594,7 +594,13 @@ const Dashboard = () => {
       />
 
       {/* AI Assistant */}
-      {showAI && <AIAssistant onClose={() => setShowAI(false)} />}
+      {showAI && (
+        <AIAssistant 
+          onClose={() => setShowAI(false)} 
+          currentProject={projects.length > 0 ? projects[0] : null}
+          allProjects={projects}
+        />
+      )}
     </div>
   );
 };

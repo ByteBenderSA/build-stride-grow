@@ -23,72 +23,41 @@ export interface ConversationContext {
 
 class GeminiService {
   private model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-  private readonly SYSTEM_PROMPT = `You are an expert AI coding mentor for CompanAI, a platform that helps complete beginners learn to code through building real projects. Your role is to:
+  
+  // Shortened, more efficient system prompt
+  private readonly SYSTEM_PROMPT = `You are CompanAI's AI coding mentor helping beginners learn through real projects. Be encouraging, provide step-by-step guidance, and suggest tools like Lovable.dev, Cursor, and Firebase. Keep responses conversational and include code examples when helpful.`;
 
-1. **Be encouraging and supportive** - Remember users are complete beginners
-2. **Provide actionable guidance** - Give specific, step-by-step instructions
-3. **Focus on practical learning** - Emphasize building projects over theory
-4. **Recommend tools** - Suggest Lovable.dev for rapid prototyping, Cursor for coding, Firebase for backend
-5. **Be patient** - Explain concepts simply without being condescending
-6. **Ask clarifying questions** - Help users narrow down their goals
-7. **Provide project ideas** - Suggest beginner-friendly projects that teach important concepts
-
-Guidelines:
-- Keep responses conversational and friendly
-- Use simple language and avoid jargon when possible
-- If using technical terms, briefly explain them
-- Provide code examples when helpful
-- Suggest next steps after each interaction
-- Remember the user's context and previous conversations
-
-Current conversation context will be provided with each message.`;
-
-  async generateResponse(
+  // Streaming response method for better UX
+  async generateStreamingResponse(
     messages: ChatMessage[],
-    context?: ConversationContext
+    context?: ConversationContext,
+    currentUserMessage?: string,
+    onChunk?: (chunk: string) => void
   ): Promise<string> {
     try {
-      // Build context-aware prompt
-      let contextPrompt = this.SYSTEM_PROMPT;
-      
-      if (context) {
-        contextPrompt += `\n\nUser Context:`;
-        if (context.skillLevel) {
-          contextPrompt += `\n- Skill Level: ${context.skillLevel}`;
-        }
-        if (context.currentProject) {
-          contextPrompt += `\n- Current Project: ${context.currentProject}`;
-        }
-        if (context.userProgress) {
-          contextPrompt += `\n- Progress: ${context.userProgress}`;
-        }
-        if (context.lastTopics && context.lastTopics.length > 0) {
-          contextPrompt += `\n- Recent Topics: ${context.lastTopics.join(', ')}`;
-        }
-      }
-
-      // Format chat history for Gemini
+      // Messages are already limited to 10 by the sliding window system
       const chatHistory = messages.map(msg => ({
         role: msg.role,
         parts: [{ text: msg.parts }]
       }));
 
-      // Add system prompt as the first message
-      const fullHistory = [
-        {
-          role: 'user' as const,
-          parts: [{ text: contextPrompt }]
-        },
-        {
-          role: 'model' as const,
-          parts: [{ text: 'I understand my role as your AI coding mentor. I\'m here to help you learn coding through building real projects. What would you like to work on today?' }]
-        },
-        ...chatHistory
-      ];
+      // Ensure chat history starts with a user message
+      if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
+        // Remove first model message if it starts with one
+        chatHistory.shift();
+      }
 
-      // Generate response
+      // If no messages or empty history, start with a simple user greeting
+      if (chatHistory.length === 0) {
+        chatHistory.push({
+          role: 'user',
+          parts: [{ text: 'Hello, I need help with coding.' }]
+        });
+      }
+
+      // Start chat with properly formatted history
       const chat = this.model.startChat({
-        history: fullHistory,
+        history: chatHistory,
         generationConfig: {
           temperature: 0.7,
           topK: 40,
@@ -97,14 +66,89 @@ Current conversation context will be provided with each message.`;
         },
       });
 
-      const lastMessage = messages[messages.length - 1];
-      const result = await chat.sendMessage(lastMessage.parts);
+      // Use the current user message if provided, otherwise get from messages array
+      let messageToSend = currentUserMessage || messages[messages.length - 1]?.parts;
       
-      return result.response.text();
+      if (!messageToSend) {
+        throw new Error('No message to send');
+      }
+
+      // Add context to the user message if available
+      if (context) {
+        let contextSuffix = '';
+        if (context.currentProject) {
+          contextSuffix += `\n\n[Context: Currently working on project "${context.currentProject}"]`;
+        }
+        if (context.skillLevel) {
+          contextSuffix += `\n[My skill level: ${context.skillLevel}]`;
+        }
+        if (contextSuffix) {
+          messageToSend = messageToSend + contextSuffix;
+        }
+      }
+
+      // Add system guidance to the first message if this is a new conversation
+      if (chatHistory.length <= 1) {
+        messageToSend = `${this.SYSTEM_PROMPT}\n\nUser question: ${messageToSend}`;
+      }
+      
+      // Use streaming for immediate feedback
+      const result = await chat.sendMessageStream(messageToSend);
+      
+      let fullResponse = '';
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        fullResponse += chunkText;
+        onChunk?.(chunkText); // Stream chunks to UI
+      }
+      
+      return fullResponse;
     } catch (error) {
       console.error('Error generating AI response:', error);
       throw new Error('Failed to generate response. Please try again.');
     }
+  }
+
+  // Keep the original method for non-streaming use cases
+  async generateResponse(
+    messages: ChatMessage[],
+    context?: ConversationContext
+  ): Promise<string> {
+    return this.generateStreamingResponse(messages, context);
+  }
+
+  // Simplified message analysis (optional - can be removed to eliminate dual API calls)
+  analyzeUserMessageSync(message: string): {
+    intent: 'question' | 'help_request' | 'project_idea' | 'debug_help' | 'general';
+    topics: string[];
+    urgency: 'low' | 'medium' | 'high';
+  } {
+    // Simple regex-based analysis instead of API call
+    const lowerMessage = message.toLowerCase();
+    
+    let intent: 'question' | 'help_request' | 'project_idea' | 'debug_help' | 'general' = 'general';
+    if (lowerMessage.includes('help') || lowerMessage.includes('how to')) {
+      intent = 'help_request';
+    } else if (lowerMessage.includes('?')) {
+      intent = 'question';
+    } else if (lowerMessage.includes('error') || lowerMessage.includes('bug')) {
+      intent = 'debug_help';
+    } else if (lowerMessage.includes('project') || lowerMessage.includes('app') || lowerMessage.includes('build')) {
+      intent = 'project_idea';
+    }
+
+    // Extract topics using simple keyword matching
+    const topics: string[] = [];
+    const techKeywords = ['react', 'javascript', 'python', 'css', 'html', 'firebase', 'api', 'database'];
+    techKeywords.forEach(keyword => {
+      if (lowerMessage.includes(keyword)) {
+        topics.push(keyword);
+      }
+    });
+
+    const urgency = lowerMessage.includes('urgent') || lowerMessage.includes('asap') ? 'high' : 'medium';
+
+    return { intent, topics, urgency };
   }
 
   async generateProjectIdea(userInput?: string, skillLevel?: string): Promise<string> {
@@ -187,45 +231,6 @@ Generate 3 distinct variations now:`;
     } catch (error) {
       console.error('Error generating project idea:', error);
       throw new Error('Failed to generate project idea. Please try again.');
-    }
-  }
-
-  async analyzeUserMessage(message: string): Promise<{
-    intent: 'question' | 'help_request' | 'project_idea' | 'debug_help' | 'general';
-    topics: string[];
-    urgency: 'low' | 'medium' | 'high';
-  }> {
-    try {
-      const prompt = `Analyze this user message and extract:
-      1. Intent (question, help_request, project_idea, debug_help, or general)
-      2. Key topics mentioned (as array)
-      3. Urgency level (low, medium, high)
-      
-      Message: "${message}"
-      
-      Respond in JSON format only.`;
-
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text();
-      
-      // Parse JSON response
-      try {
-        return JSON.parse(response);
-      } catch {
-        // Fallback if JSON parsing fails
-        return {
-          intent: 'general' as const,
-          topics: [],
-          urgency: 'medium' as const
-        };
-      }
-    } catch (error) {
-      console.error('Error analyzing message:', error);
-      return {
-        intent: 'general' as const,
-        topics: [],
-        urgency: 'medium' as const
-      };
     }
   }
 

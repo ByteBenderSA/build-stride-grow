@@ -124,6 +124,60 @@ export interface UserProgress {
   notes?: string;
 }
 
+// Idea Workflow interface - for saving incremental progress
+export interface IdeaWorkflow {
+  id: string;
+  userId: string;
+  currentStep: 'input' | 'ideas' | 'customize' | 'prompts';
+  formData: {
+    appName: string;
+    description: string;
+    targetAudience: string;
+    keyFeatures: string;
+    skillLevel: string;
+  };
+  generatedIdeas: Array<{
+    id: number;
+    title: string;
+    description: string;
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+    timeEstimate: string;
+    techStack: string[];
+    marketPotential: string;
+    features: string[];
+    why: string;
+    learningObjectives: string[];
+    roadmap: string[];
+  }>;
+  selectedIdea?: {
+    id: number;
+    title: string;
+    description: string;
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+    timeEstimate: string;
+    techStack: string[];
+    marketPotential: string;
+    features: string[];
+    why: string;
+    learningObjectives: string[];
+    roadmap: string[];
+  };
+  customization?: {
+    colorScheme: string;
+    layoutStyle: string;
+    fontVibe: string;
+    features: string[];
+    customFeatures: string;
+    userFlow: string;
+    customHexColor?: string;
+  };
+  refinedPrompts?: string;
+  createdAt: string;
+  updatedAt: string;
+  isCompleted: boolean;
+  projectId?: string; // Set when saved as project
+}
+
 // Project CRUD operations
 export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   const projectRef = doc(collection(db, 'projects'));
@@ -285,12 +339,93 @@ export const subscribeToUserProjects = (userId: string, callback: (projects: Pro
 
 export const subscribeToConversation = (conversationId: string, callback: (conversation: Conversation | null) => void) => {
   const conversationRef = doc(db, 'conversations', conversationId);
-  
-  return onSnapshot(conversationRef, (snapshot) => {
-    if (snapshot.exists()) {
-      callback(snapshot.data() as Conversation);
+  return onSnapshot(conversationRef, (doc) => {
+    if (doc.exists()) {
+      callback(doc.data() as Conversation);
     } else {
       callback(null);
     }
   });
+};
+
+// Idea Workflow CRUD operations
+export const createIdeaWorkflow = async (workflow: Omit<IdeaWorkflow, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const workflowRef = doc(collection(db, 'ideaWorkflows'));
+  const newWorkflow: IdeaWorkflow = {
+    ...workflow,
+    id: workflowRef.id,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  
+  await setDoc(workflowRef, {
+    ...newWorkflow,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+  
+  return workflowRef.id;
+};
+
+export const updateIdeaWorkflow = async (workflowId: string, updates: Partial<IdeaWorkflow>): Promise<void> => {
+  const workflowRef = doc(db, 'ideaWorkflows', workflowId);
+  await updateDoc(workflowRef, {
+    ...updates,
+    updatedAt: serverTimestamp()
+  });
+};
+
+export const getIdeaWorkflow = async (workflowId: string): Promise<IdeaWorkflow | null> => {
+  const workflowRef = doc(db, 'ideaWorkflows', workflowId);
+  const workflowSnapshot = await getDoc(workflowRef);
+  
+  if (workflowSnapshot.exists()) {
+    return workflowSnapshot.data() as IdeaWorkflow;
+  }
+  
+  return null;
+};
+
+export const getUserActiveIdeaWorkflow = async (userId: string): Promise<IdeaWorkflow | null> => {
+  const workflowsRef = collection(db, 'ideaWorkflows');
+  const q = query(
+    workflowsRef,
+    where('userId', '==', userId),
+    where('isCompleted', '==', false),
+    orderBy('updatedAt', 'desc'),
+    limit(1)
+  );
+  
+  const snapshot = await getDocs(q);
+  if (snapshot.docs.length > 0) {
+    return snapshot.docs[0].data() as IdeaWorkflow;
+  }
+  
+  return null;
+};
+
+export const getUserIdeaWorkflows = async (userId: string): Promise<IdeaWorkflow[]> => {
+  const workflowsRef = collection(db, 'ideaWorkflows');
+  const q = query(
+    workflowsRef,
+    where('userId', '==', userId),
+    orderBy('updatedAt', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => doc.data() as IdeaWorkflow);
+};
+
+export const completeIdeaWorkflow = async (workflowId: string, projectId?: string): Promise<void> => {
+  const workflowRef = doc(db, 'ideaWorkflows', workflowId);
+  await updateDoc(workflowRef, {
+    isCompleted: true,
+    projectId: projectId,
+    updatedAt: serverTimestamp()
+  });
+};
+
+export const deleteIdeaWorkflow = async (workflowId: string): Promise<void> => {
+  const workflowRef = doc(db, 'ideaWorkflows', workflowId);
+  await deleteDoc(workflowRef);
 }; 

@@ -14,9 +14,11 @@ import {
   ExternalLink,
   PlayCircle,
   Book,
-  MessageSquare
+  MessageSquare,
+  Target
 } from "lucide-react";
 import WorkflowGuide from "@/components/WorkflowGuide";
+import AIAssistant from "@/components/AIAssistant";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserProjects, updateProject } from "@/lib/firestore";
@@ -46,11 +48,22 @@ const DynamicPromptSection = ({
   
   // Load cached prompts when component mounts or project changes
   useEffect(() => {
-    if (project?.generatedPrompts?.lovablePrompt && project?.generatedPrompts?.cursorPrompt) {
+    // Check both old location (generatedPrompts) and new location (prompts) for backward compatibility
+    const hasGeneratedPrompts = project?.generatedPrompts?.lovablePrompt && project?.generatedPrompts?.cursorPrompt;
+    const hasStandardPrompts = project?.prompts?.lovable && project?.prompts?.cursor;
+    
+    if (hasGeneratedPrompts) {
+      // Use the generatedPrompts format (newer format)
       const cachedPrompt = `${project.generatedPrompts.lovablePrompt}\n\n---\n\n${project.generatedPrompts.cursorPrompt}`;
       setGeneratedPrompt(cachedPrompt);
       setSelectedColorScheme(project.generatedPrompts.colorScheme || selectedColorScheme);
       setHasLoadedCache(true);
+    } else if (hasStandardPrompts) {
+      // Use the standard prompts format (existing projects)
+      const cachedPrompt = `${project.prompts.lovable}\n\n---\n\n${project.prompts.cursor}`;
+      setGeneratedPrompt(cachedPrompt);
+      setHasLoadedCache(true);
+      console.log('✅ Loaded existing prompts from project.prompts');
     } else {
       setHasLoadedCache(false);
     }
@@ -128,48 +141,39 @@ const DynamicPromptSection = ({
               </>
             ) : (
               <>
-                ✨ {hasLoadedCache ? 'Regenerate Prompts' : 'Generate Complete Development Prompts'}
+                {hasLoadedCache ? '🔄 Regenerate Prompts' : '✨ Generate Complete Development Prompts'}
               </>
             )}
           </Button>
-          
-          {hasLoadedCache && (
-            <Button 
-              variant="outline"
-              onClick={() => handleGenerate(true)}
-              disabled={isGenerating}
-              className="border-purple-200 text-purple-700 hover:bg-purple-50"
-            >
-              🔄 New Version
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Color Scheme Selection */}
-      <div className="bg-gray-50 rounded-lg p-4 border">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">🎨 Choose Color Scheme</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {Object.entries(colorSchemes).map(([key, scheme]: [string, any]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedColorScheme(key)}
-              className={`p-3 rounded-lg border text-left transition-all ${
-                selectedColorScheme === key
-                  ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                  : 'border-gray-200 hover:border-gray-300 bg-white'
-              }`}
-            >
-              <div 
-                className="w-full h-3 rounded mb-2"
-                style={{ background: `linear-gradient(to right, ${scheme.primary})` }}
-              ></div>
-              <div className="text-sm font-medium text-gray-900">{scheme.name}</div>
-              <div className="text-xs text-gray-500">{scheme.description}</div>
-            </button>
-          ))}
+      {/* Color Scheme Selection - Hidden for better UX, shown only when regenerating */}
+      {!hasLoadedCache && (
+        <div className="bg-gray-50 rounded-lg p-4 border">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">🎨 Choose Color Scheme</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {Object.entries(colorSchemes).map(([key, scheme]: [string, any]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedColorScheme(key)}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  selectedColorScheme === key
+                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                <div 
+                  className="w-full h-3 rounded mb-2"
+                  style={{ background: `linear-gradient(to right, ${scheme.primary})` }}
+                ></div>
+                <div className="text-sm font-medium text-gray-900">{scheme.name}</div>
+                <div className="text-xs text-gray-500">{scheme.description}</div>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {!generatedPrompt && !isGenerating && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
@@ -189,10 +193,18 @@ const DynamicPromptSection = ({
           <div className="flex items-center gap-2 text-green-700">
             <CheckCircle className="w-4 h-4" />
             <span className="text-sm font-medium">
-              ✨ Cached prompts loaded instantly! Generated with {project?.generatedPrompts?.colorScheme?.replace('-', ' ')} color scheme
+              ✨ Existing prompts loaded! 
+              {project?.generatedPrompts?.colorScheme && (
+                <span>Generated with {project.generatedPrompts.colorScheme.replace('-', ' ')} color scheme</span>
+              )}
               {project?.generatedPrompts?.generatedAt && (
                 <span className="text-green-600 ml-1">
                   on {new Date(project.generatedPrompts.generatedAt).toLocaleDateString()}
+                </span>
+              )}
+              {!project?.generatedPrompts?.generatedAt && project?.createdAt && (
+                <span className="text-green-600 ml-1">
+                  Ready to use from your project
                 </span>
               )}
             </span>
@@ -236,10 +248,12 @@ const DynamicPromptSection = ({
                           </Button>
                         </div>
                       </div>
-                      <div className="bg-gray-900 p-4">
-                        <pre className="text-green-400 text-sm overflow-x-auto whitespace-pre-wrap">
-                          <code>{lovableSection}</code>
-                        </pre>
+                      <div className="bg-gray-900 p-4 max-w-full">
+                        <div className="max-h-[400px] overflow-y-auto">
+                          <pre className="text-green-400 text-sm whitespace-pre-wrap break-words">
+                            <code>{lovableSection}</code>
+                          </pre>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -270,10 +284,12 @@ const DynamicPromptSection = ({
                           </Button>
                         </div>
                       </div>
-                      <div className="bg-gray-900 p-4">
-                        <pre className="text-green-400 text-sm overflow-x-auto whitespace-pre-wrap">
-                          <code>{cursorSection}</code>
-                        </pre>
+                      <div className="bg-gray-900 p-4 max-w-full">
+                        <div className="max-h-[400px] overflow-y-auto">
+                          <pre className="text-green-400 text-sm whitespace-pre-wrap break-words">
+                            <code>{cursorSection}</code>
+                          </pre>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -308,9 +324,11 @@ const Workspace = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("instructions");
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingPrompt, setGeneratingPrompt] = useState(false);
   const [selectedColorScheme, setSelectedColorScheme] = useState("blue-purple");
+  const [showAI, setShowAI] = useState(false);
 
   // Color scheme options
   const colorSchemes = {
@@ -726,122 +744,109 @@ Ready to build your first app? Head to the **Idea Workshop** to generate your pe
       {
         id: 2,
         title: "📁 GitHub Setup & Code Management",
-        description: "Organize your code professionally",
+        description: "Connect to GitHub and clone locally",
         completed: project.progress.completedSteps.includes(2),
         content: {
           instructions: `
-# 📁 **Step 2: Professional Code Organization**
+# 📁 **Step 2: GitHub Integration & Local Setup**
 
-**Goal:** Set up a professional GitHub repository and prepare for Cursor development.
+**Goal:** Connect your Lovable app to GitHub and prepare for Cursor development.
 
-## **🛤️ Complete Workflow:**
+## **🚀 Simple Workflow:**
 
-### **A. Download from Lovable:**
-1. **Export your code** from Lovable (ZIP download)
-2. **Extract the files** to your computer
-3. **Review the code structure** (components, pages, styles)
+### **A. Connect GitHub in Lovable:**
+1. **In your Lovable project**, look for the GitHub integration button
+2. **Click "Connect to GitHub"** (usually in top toolbar or project settings)
+3. **Authorize Lovable** to access your GitHub account
+4. **Choose repository name:** \`${projectSlug}\` (or similar)
+5. **Select "Public"** for portfolio showcase
+6. **Let Lovable create the repository** automatically ✨
 
-### **B. Create GitHub Repository:**
-1. **Go to GitHub.com** and create new repository
-2. **Repository name:** \`${projectSlug}\`
-3. **Description:** "${project.description}"
-4. **Set to Public** (for portfolio showcase)
-5. **Initialize with README** ✅
+### **B. Get Your Repository URL:**
+1. **Lovable will show you the GitHub URL** after connection
+2. **Copy the HTTPS clone URL** (looks like: \`https://github.com/username/${projectSlug}.git\`)
+3. **Save this URL** - you'll need it for Cursor
 
-### **C. Upload Your Code:**
-1. **Upload files** via GitHub web interface, OR
-2. **Use Git commands** (if you have Git installed):
+### **C. Clone to Your Computer:**
+1. **Open Terminal/Command Prompt** on your computer
+2. **Navigate to your projects folder:**
+   \`\`\`bash
+   cd ~/Documents/Projects  # or wherever you keep projects
+   \`\`\`
+3. **Clone the repository:**
    \`\`\`bash
    git clone https://github.com/YOUR-USERNAME/${projectSlug}.git
    cd ${projectSlug}
-   # Copy your Lovable files here
-   git add .
-   git commit -m "Initial frontend from Lovable"
-   git push origin main
    \`\`\`
 
-### **D. Repository Setup:**
-1. **Add proper README.md** with project description
-2. **Create project structure** documentation
-3. **Set up development branch** for active work
-4. **Add .gitignore** for node_modules and env files
+### **D. Verify Setup:**
+1. **Open the folder** in your file explorer
+2. **Check that all files are there** (components, pages, etc.)
+3. **Repository is ready** for Cursor development!
 
-## **📋 Repository Checklist:**
-- ✅ Code uploaded and organized
-- ✅ README with project description
-- ✅ Public repository for portfolio
-- ✅ Clean commit history
-- ✅ Ready for Cursor integration
+## **✅ You'll Know You're Done When:**
+- ✅ Lovable is connected to GitHub
+- ✅ Repository appears in your GitHub account
+- ✅ Code is cloned to your local computer
+- ✅ You have the folder path ready for Cursor
 
-**Next:** Copy your GitHub repo URL for Step 3 (Cursor Development)!
+**Next:** Open this folder in Cursor for Step 3!
           `,
           codeAndPrompts: `
-# 📋 **GITHUB REPOSITORY SETUP**
+# 🔗 **LOVABLE → GITHUB INTEGRATION**
 
-## **Repository Details:**
-- **Name:** \`${projectSlug}\`
-- **Description:** "${project.description}"
-- **Visibility:** Public (for portfolio)
+## **Quick Setup Checklist:**
+- ✅ Connect GitHub from Lovable interface
+- ✅ Repository auto-created as: \`${projectSlug}\`
+- ✅ Set to Public for portfolio showcase
+- ✅ Copy the clone URL from Lovable/GitHub
 
-## **README.md Template:**
-\`\`\`markdown
-# ${project.title}
-
-${project.description}
-
-## 🚀 Features
-${features.map(feature => `- ${feature}`).join('\n')}
-
-## 🛠️ Tech Stack
-${project.techStack.map(tech => `- ${tech}`).join('\n')}
-
-## 📱 Demo
-[Live Demo](https://your-app-url.com) | [Video Demo](link-to-demo-video)
-
-## 🏗️ Development Process
-1. **UI Design:** Created with Lovable.dev
-2. **Backend:** Built with Cursor AI assistance  
-3. **Database:** Firebase Firestore
-4. **Deployment:** Firebase Hosting
-
-## 📦 Installation
+## **Clone Commands:**
 \`\`\`bash
-npm install
-npm run dev
-\`\`\`
+# Navigate to your projects folder
+cd ~/Documents/Projects
 
-## 🤝 Contributing
-Built as part of CompanAI learning journey.
-
-## 📄 License
-MIT License
-\`\`\`
-
-## **Git Commands Reference:**
-\`\`\`bash
-# Initial setup
+# Clone your repository (replace with your actual URL)
 git clone https://github.com/YOUR-USERNAME/${projectSlug}.git
+
+# Enter the project directory
 cd ${projectSlug}
 
-# Add your Lovable code
-# (Copy all files from Lovable download)
-
-# Commit and push
-git add .
-git commit -m "✨ Initial frontend from Lovable"
-git push origin main
-
-# Create development branch
-git checkout -b development
-git push origin development
+# Verify files are there
+ls -la
 \`\`\`
+
+## **Expected Project Structure:**
+\`\`\`
+${projectSlug}/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   ├── lib/
+│   └── main.tsx
+├── public/
+├── package.json
+├── vite.config.ts
+├── tailwind.config.ts
+└── README.md
+\`\`\`
+
+## **Next Steps:**
+1. ✅ Folder is ready on your computer
+2. ✅ Open this folder in Cursor
+3. ✅ Ready for backend development!
+
+## **Troubleshooting:**
+- **Can't find GitHub button?** Look in project settings or top toolbar
+- **Permission issues?** Make sure you're logged into GitHub in your browser
+- **Clone failed?** Check the URL and your internet connection
           `,
           resources: [
-            "GitHub Desktop App",
-            "Git Command Line Guide",
-            "Repository Best Practices",
-            "README Writing Guide",
-            "Open Source Licenses"
+            "Lovable GitHub Integration",
+            "Git Clone Command Guide",
+            "Terminal/Command Prompt Basics",
+            "File System Navigation",
+            "Cursor Installation Guide"
           ]
         }
       },
@@ -860,9 +865,9 @@ git push origin development
 
 ### **A. Setup Cursor:**
 1. **Open Cursor AI** (download from cursor.com if needed)
-2. **Clone your repository:** File → Clone Repository
-3. **Enter your GitHub URL:** https://github.com/YOUR-USERNAME/${projectSlug}
-4. **Open the project** in Cursor workspace
+2. **Open your project folder:** File → Open Folder
+3. **Navigate to your cloned repository:** \`~/Documents/Projects/${projectSlug}\`
+4. **Cursor will recognize** it as a React TypeScript project
 
 ### **B. AI-Powered Development:**
 1. **Open Cursor Chat** (Ctrl/Cmd + L)
@@ -1262,6 +1267,8 @@ Live: https://${projectSlug}.web.app
       
       try {
         const projects = await getUserProjects(user.id);
+        setAllProjects(projects);
+        
         // Get the most recent project that's not completed
         const activeProject = projects.find(p => p.status !== 'completed') || projects[0];
         setCurrentProject(activeProject || null);
@@ -1414,57 +1421,82 @@ Live: https://${projectSlug}.web.app
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
-        <div className="container mx-auto px-6 py-4">
-          <Link to="/dashboard" className="flex items-center text-purple-600 hover:text-purple-700 mb-2">
+        <div className="container mx-auto px-6 py-6">
+          <Link to="/dashboard" className="flex items-center text-purple-600 hover:text-purple-700 mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </Link>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                <Code className="w-5 h-5 text-white" />
+          
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+              <Code className="w-6 h-6 text-white" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-2xl font-bold text-gray-900 truncate">
+                  {currentProject?.title || "Loading..."}
+                </h1>
+                <Badge className="bg-blue-100 text-blue-700 px-3 py-1 text-sm font-medium">
+                  Step {currentStep + 1} of {tutorialSteps.length}
+                </Badge>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{currentProject?.title || "Loading..."}</h1>
-                <p className="text-gray-600">{currentProject?.description || "Loading..."}</p>
+              
+              <p className="text-gray-600 leading-relaxed text-sm max-w-2xl">
+                {currentProject?.description || "Loading..."}
+              </p>
+              
+              {/* Progress indicator */}
+              <div className="mt-3 flex items-center gap-3">
+                <Progress 
+                  value={currentProject ? Math.round((currentProject.progress.completedSteps.length / tutorialSteps.length) * 100) : 0} 
+                  className="flex-1 h-2" 
+                />
+                <span className="text-sm text-gray-500 font-medium whitespace-nowrap">
+                  {currentProject?.progress.completedSteps.length || 0} / {tutorialSteps.length} steps
+                </span>
               </div>
             </div>
-            <Badge className="bg-blue-100 text-blue-700">
-              Step {currentStep + 1} of {tutorialSteps.length}
-            </Badge>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-6 py-8 max-w-7xl">
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Progress Sidebar */}
           <div className="lg:col-span-1">
             <Card className="shadow-lg border-0 sticky top-8">
               <CardHeader>
-                <CardTitle className="text-lg">Your Progress</CardTitle>
-                                 <Progress value={currentProject ? Math.round((currentProject.progress.completedSteps.length / tutorialSteps.length) * 100) : 0} className="mt-2" />
-                <p className="text-sm text-gray-600 mt-1">
-                  {currentProject?.progress.completedSteps.length || 0} of {tutorialSteps.length} steps completed
-                </p>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="w-5 h-5 text-purple-600" />
+                  Project Steps
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {tutorialSteps.map((step, index) => (
                     <div
                       key={step.id}
-                                             className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                         index === currentStep ? 'bg-purple-50 border border-purple-200' : 'hover:bg-gray-50'
-                       }`}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                        index === currentStep 
+                          ? 'bg-purple-50 border border-purple-200 shadow-sm' 
+                          : 'hover:bg-gray-50 border border-transparent'
+                      }`}
                       onClick={() => handleCompleteStep(step.id)}
                     >
                       {currentProject?.progress.completedSteps.includes(step.id) ? (
                         <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : index === currentStep ? (
+                        <div className="w-5 h-5 rounded-full border-2 border-purple-600 bg-purple-100"></div>
                       ) : (
                         <Circle className="w-5 h-5 text-gray-400" />
                       )}
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{step.title}</p>
+                        <p className={`text-sm font-medium ${
+                          index === currentStep ? 'text-purple-900' : 'text-gray-900'
+                        }`}>
+                          {step.title}
+                        </p>
                         <p className="text-xs text-gray-500">{step.description}</p>
                       </div>
                     </div>
@@ -1476,16 +1508,21 @@ Live: https://${projectSlug}.web.app
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-                         {tutorialSteps.map((step, index) => (
-               index === currentStep && (
-                <Card key={step.id} className="shadow-xl border-0">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-xl">{step.title}</CardTitle>
-                        <p className="text-gray-600 mt-1">{step.description}</p>
+            {tutorialSteps.map((step, index) => (
+              index === currentStep && (
+                <Card key={step.id} className="shadow-xl border-0 overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 border-b">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {step.id}
+                          </div>
+                          <CardTitle className="text-xl text-gray-900">{step.title}</CardTitle>
+                        </div>
+                        <p className="text-gray-600 text-sm ml-11">{step.description}</p>
                       </div>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="shrink-0 bg-white">
                         {step.id === 1 ? "Setup" : step.id === 2 ? "Core" : step.id === 3 ? "Styling" : "Deployment"}
                       </Badge>
                     </div>
@@ -1518,7 +1555,7 @@ Live: https://${projectSlug}.web.app
                             Mark as Complete
                           </Button>
                           <div className="text-sm text-gray-600 flex items-center">
-                            💡 Use the chat above to get personalized help with your {currentProject?.title} project
+                            💡 Click the AI assistant button (bottom-right) for personalized help with your {currentProject?.title} project
                           </div>
                         </div>
                       </TabsContent>
@@ -1538,10 +1575,12 @@ Live: https://${projectSlug}.web.app
                           ) : (
                             <>
                               <h3 className="text-lg font-semibold">Copy this prompt to your editor:</h3>
-                              <div className="bg-gray-900 rounded-lg p-4 relative">
-                                <pre className="text-green-400 text-sm overflow-x-auto">
-                                  <code>{step.content.codeAndPrompts}</code>
-                                </pre>
+                              <div className="bg-gray-900 rounded-lg p-4 relative max-w-full">
+                                <div className="max-h-[500px] overflow-y-auto">
+                                  <pre className="text-green-400 text-sm whitespace-pre-wrap break-words">
+                                    <code>{step.content.codeAndPrompts}</code>
+                                  </pre>
+                                </div>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1553,14 +1592,18 @@ Live: https://${projectSlug}.web.app
                               </div>
                               
                               <div className="flex gap-2">
-                                <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-                                  <PlayCircle className="w-4 h-4 mr-2" />
-                                  Open in Cursor
-                                </Button>
-                                <Button variant="outline">
-                                  <ExternalLink className="w-4 h-4 mr-2" />
-                                  Open in Lovable
-                                </Button>
+                                {step.id === 3 && (
+                                  <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+                                    <PlayCircle className="w-4 h-4 mr-2" />
+                                    Open in Cursor
+                                  </Button>
+                                )}
+                                {(step.id === 1 || step.id === 4) && (
+                                  <Button variant="outline">
+                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                    Open in Lovable
+                                  </Button>
+                                )}
                               </div>
                             </>
                           )}
@@ -1625,6 +1668,24 @@ Live: https://${projectSlug}.web.app
           </div>
         </div>
       </div>
+
+      {/* Floating AI Assistant Button */}
+      <Button
+        onClick={() => setShowAI(true)}
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-2xl"
+        title="AI Assistant - Get help with your project"
+      >
+        <MessageSquare className="w-6 h-6 text-white" />
+      </Button>
+
+      {/* AI Assistant */}
+      {showAI && (
+        <AIAssistant 
+          onClose={() => setShowAI(false)} 
+          currentProject={currentProject}
+          allProjects={allProjects}
+        />
+      )}
     </div>
   );
 };

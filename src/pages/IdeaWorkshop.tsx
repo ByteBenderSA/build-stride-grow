@@ -33,7 +33,14 @@ import {
 } from "lucide-react";
 import { geminiService } from "@/lib/gemini";
 import { useAuth } from "@/contexts/AuthContext";
-import { createProject } from "@/lib/firestore";
+import { 
+  createProject, 
+  createIdeaWorkflow, 
+  updateIdeaWorkflow, 
+  getUserActiveIdeaWorkflow, 
+  completeIdeaWorkflow,
+  type IdeaWorkflow 
+} from "@/lib/firestore";
 import { checkUsageLimit, incrementUsage } from '@/lib/subscriptions'
 import { UsageLimitModal } from '@/components/ui/usage-limit-modal'
 import { IdeaCustomizationForm } from '@/components/IdeaCustomizationForm'
@@ -228,6 +235,9 @@ const IdeaWorkshop = () => {
   const [isRefining, setIsRefining] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(true);
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
+  const [showRecoveryNotice, setShowRecoveryNotice] = useState(false);
   const [formData, setFormData] = useState({
     appName: "",
     description: "",
@@ -238,6 +248,74 @@ const IdeaWorkshop = () => {
   const [generatedIdeas, setGeneratedIdeas] = useState<GeneratedIdea[]>([]);
   const [selectedIdea, setSelectedIdea] = useState<GeneratedIdea | null>(null);
   const [refinedPrompts, setRefinedPrompts] = useState<string>("");
+
+  // Load existing workflow on component mount
+  useEffect(() => {
+    const loadExistingWorkflow = async () => {
+      if (!user) {
+        setIsLoadingWorkflow(false);
+        return;
+      }
+
+      try {
+        const activeWorkflow = await getUserActiveIdeaWorkflow(user.uid || user.id);
+        if (activeWorkflow) {
+          console.log('📋 Found existing workflow, recovering data:', activeWorkflow);
+          
+          // Restore all state from the workflow
+          setCurrentWorkflowId(activeWorkflow.id);
+          setCurrentStep(activeWorkflow.currentStep);
+          setFormData(activeWorkflow.formData);
+          setGeneratedIdeas(activeWorkflow.generatedIdeas || []);
+          setSelectedIdea(activeWorkflow.selectedIdea || null);
+          setRefinedPrompts(activeWorkflow.refinedPrompts || "");
+          
+          // Show recovery notice if not on input step
+          if (activeWorkflow.currentStep !== 'input') {
+            setShowRecoveryNotice(true);
+            setTimeout(() => setShowRecoveryNotice(false), 5000);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading existing workflow:', error);
+      } finally {
+        setIsLoadingWorkflow(false);
+      }
+    };
+
+    loadExistingWorkflow();
+  }, [user]);
+
+  // Auto-save workflow data whenever state changes
+  const saveWorkflowData = async (updates: Partial<IdeaWorkflow>) => {
+    if (!user || isLoadingWorkflow) return;
+
+    try {
+      const userId = user.uid || user.id;
+      
+      if (currentWorkflowId) {
+        // Update existing workflow
+        await updateIdeaWorkflow(currentWorkflowId, updates);
+        console.log('💾 Workflow data auto-saved');
+      } else {
+        // Create new workflow
+        const newWorkflowData: Omit<IdeaWorkflow, 'id' | 'createdAt' | 'updatedAt'> = {
+          userId,
+          currentStep: 'input',
+          formData,
+          generatedIdeas: [],
+          isCompleted: false,
+          ...updates
+        };
+        
+        const workflowId = await createIdeaWorkflow(newWorkflowData);
+        setCurrentWorkflowId(workflowId);
+        console.log('💾 New workflow created and saved:', workflowId);
+      }
+    } catch (error) {
+      console.error('Error saving workflow data:', error);
+    }
+  };
 
   const parseAIResponse = (response: string, index: number): GeneratedIdea => {
     console.log('Raw AI Response:', response);
@@ -450,6 +528,12 @@ const IdeaWorkshop = () => {
     
     if (!formData.appName.trim()) return;
 
+    // Save form data before generating
+    await saveWorkflowData({
+      currentStep: 'input',
+      formData
+    });
+
     setIsGenerating(true);
     try {
       const userInput = `App Name: ${formData.appName}
@@ -463,6 +547,14 @@ Skill Level: ${formData.skillLevel}`;
       
       setGeneratedIdeas(ideas);
       setCurrentStep('ideas');
+
+      // Save generated ideas immediately
+      await saveWorkflowData({
+        currentStep: 'ideas',
+        formData,
+        generatedIdeas: ideas
+      });
+      
     } catch (error) {
       console.error("Error generating ideas:", error);
     } finally {
@@ -470,19 +562,47 @@ Skill Level: ${formData.skillLevel}`;
     }
   };
 
-  const handleIdeaSelection = (idea: GeneratedIdea) => {
+  const handleIdeaSelection = async (idea: GeneratedIdea) => {
     setSelectedIdea(idea);
     setCurrentStep('customize');
+
+    // Save selected idea immediately
+    await saveWorkflowData({
+      currentStep: 'customize',
+      formData,
+      generatedIdeas,
+      selectedIdea: idea
+    });
   };
 
   const handleCustomizationSubmit = async (customization: any) => {
     if (!selectedIdea || !user) return;
+
+    // Save customization data before generating prompts
+    await saveWorkflowData({
+      currentStep: 'customize',
+      formData,
+      generatedIdeas,
+      selectedIdea,
+      customization
+    });
 
     setIsRefining(true);
     try {
       const refinedPromptResponse = await geminiService.generateRefinedPrompt(selectedIdea, customization);
       setRefinedPrompts(refinedPromptResponse);
       setCurrentStep('prompts');
+
+      // Save refined prompts immediately - this is the most critical data!
+      await saveWorkflowData({
+        currentStep: 'prompts',
+        formData,
+        generatedIdeas,
+        selectedIdea,
+        customization,
+        refinedPrompts: refinedPromptResponse
+      });
+      
     } catch (error) {
       console.error("Error generating refined prompts:", error);
     } finally {
@@ -603,6 +723,11 @@ Please implement a secure, scalable backend with proper error handling, validati
 
       const projectId = await createProject(projectData);
       
+      // Complete the workflow and link to the project
+      if (currentWorkflowId) {
+        await completeIdeaWorkflow(currentWorkflowId, projectId);
+      }
+      
       // Update the idea with the project ID
       setGeneratedIdeas(prev => 
         prev.map(prevIdea => 
@@ -620,8 +745,15 @@ Please implement a secure, scalable backend with proper error handling, validati
     }
   };
 
-  const handleStartOver = () => {
+  const handleStartOver = async () => {
+    // Complete current workflow if it exists
+    if (currentWorkflowId) {
+      await completeIdeaWorkflow(currentWorkflowId);
+    }
+
+    // Reset all state
     setCurrentStep('input');
+    setCurrentWorkflowId(null);
     setFormData({
       appName: "",
       description: "",
@@ -633,6 +765,21 @@ Please implement a secure, scalable backend with proper error handling, validati
     setSelectedIdea(null);
     setRefinedPrompts("");
   };
+
+  // Show loading state while recovering workflow
+  if (isLoadingWorkflow) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+        <div className="container mx-auto px-6 py-12">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-700">Loading your idea workshop...</h2>
+            <p className="text-gray-500 mt-2">Checking for any saved progress</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -842,9 +989,29 @@ Please implement a secure, scalable backend with proper error handling, validati
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 py-12">
-      <div className="container mx-auto px-6">
-        <div className="text-center mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+      {/* Recovery Notice */}
+      {showRecoveryNotice && (
+        <div className="bg-green-100 border-l-4 border-green-500 p-4">
+          <div className="container mx-auto px-6">
+            <div className="flex">
+              <CheckCircle className="h-5 w-5 text-green-400 mr-2 mt-0.5" />
+              <div>
+                <p className="text-green-700 font-medium">
+                  ✨ Progress recovered! We've restored your previous idea workshop session.
+                </p>
+                <p className="text-green-600 text-sm mt-1">
+                  Your ideas, customizations, and prompts are safe and ready to continue.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="py-12">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-8">
           <Link to="/dashboard">
             <Button variant="outline" className="mb-6">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -872,6 +1039,7 @@ Please implement a secure, scalable backend with proper error handling, validati
           onClose={() => setShowLimitModal(false)}
           type="idea"
         />
+        </div>
       </div>
     </div>
   );
