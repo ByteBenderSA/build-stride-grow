@@ -29,7 +29,6 @@ import {
   BookOpen,
   LogOut,
   CheckCircle,
-  Crown,
   Rocket
 } from "lucide-react";
 import AIAssistant from "@/components/AIAssistant";
@@ -224,18 +223,6 @@ const Dashboard = () => {
       link: "/workspace",
       priority: onboardingConfig.prioritizeBuilder ? 1 : 2
     });
-
-    // Upgrade Plan - Show only for Free and Pro users, not Ultra users
-    if (userSubscription?.plan !== 'ultra') {
-      actions.push({
-        title: "Upgrade Plan",
-        description: "Unlock more AI ideas & interactions",
-        icon: Crown,
-        color: "from-purple-500 to-purple-600",
-        link: "/pricing",
-        priority: 3
-      });
-    }
 
     // Get Help
     actions.push({
