@@ -64,7 +64,7 @@ const TECH_LESSONS: Lesson[] = [
         "Modern tech stack - React, TypeScript, and more",
         "Instant deployment - from idea to live app in minutes"
       ],
-      howWeUse: "In BuildFlow, we use Lovable as your primary building tool. You'll describe your app idea, and Lovable will generate the initial codebase. Then you can iterate, add features, and customize - all through natural conversation with AI.",
+      howWeUse: "In CompanAI, we use Lovable as your primary building tool. You'll describe your app idea, and Lovable will generate the initial codebase. Then you can iterate, add features, and customize - all through natural conversation with AI.",
       quickTips: [
         "Be specific in your descriptions - the more detail, the better results",
         "Start simple and add complexity gradually",
@@ -126,7 +126,7 @@ const TECH_LESSONS: Lesson[] = [
         "Storage - handle images and files securely",
         "Analytics - understand how users interact with your app"
       ],
-      howWeUse: "Every BuildFlow app uses Firebase as its backend. Your user accounts, project data, AI conversations - everything is stored and managed by Firebase. It automatically syncs across all your devices and keeps your data secure.",
+      howWeUse: "Every CompanAI app uses Firebase as its backend. Your user accounts, project data, AI conversations - everything is stored and managed by Firebase. It automatically syncs across all your devices and keeps your data secure.",
       quickTips: [
         "Firestore is real-time - changes sync instantly across devices",
         "Security rules protect your data automatically",
@@ -157,7 +157,7 @@ const TECH_LESSONS: Lesson[] = [
         "Issues & Planning - organize your project development",
         "Actions - automate testing and deployment"
       ],
-      howWeUse: "Every BuildFlow project gets its own GitHub repository. This gives you version control, lets you collaborate with others, and creates a professional portfolio. Plus, many deployment platforms connect directly to GitHub.",
+      howWeUse: "Every CompanAI project gets its own GitHub repository. This gives you version control, lets you collaborate with others, and creates a professional portfolio. Plus, many deployment platforms connect directly to GitHub.",
       quickTips: [
         "Commit small, focused changes with clear messages",
         "Use branches for new features",
@@ -189,7 +189,7 @@ const TECH_LESSONS: Lesson[] = [
         "Refactoring confidence - rename and restructure safely",
         "Modern JavaScript features - use latest language features"
       ],
-      howWeUse: "All BuildFlow projects use TypeScript by default. You don't need to master it immediately - start with basic types and gradually learn more. The AI assistants (Lovable and Cursor) will help you with TypeScript syntax.",
+      howWeUse: "All CompanAI projects use TypeScript by default. You don't need to master it immediately - start with basic types and gradually learn more. The AI assistants (Lovable and Cursor) will help you with TypeScript syntax.",
       quickTips: [
         "Start with basic types: string, number, boolean",
         "Let TypeScript infer types when possible",
@@ -220,7 +220,7 @@ const TECH_LESSONS: Lesson[] = [
         "Dark mode support - toggle themes effortlessly",
         "Component-friendly - works great with React components"
       ],
-      howWeUse: "Every BuildFlow project uses Tailwind for styling. You'll use classes like 'bg-purple-600 text-white p-4 rounded-lg' to style elements. The AI assistants know Tailwind well and will suggest the right classes for your designs.",
+      howWeUse: "Every CompanAI project uses Tailwind for styling. You'll use classes like 'bg-purple-600 text-white p-4 rounded-lg' to style elements. The AI assistants know Tailwind well and will suggest the right classes for your designs.",
       quickTips: [
         "Start with basic utilities: margin (m-), padding (p-), colors (bg-, text-)",
         "Use the official docs for class reference",
@@ -471,7 +471,7 @@ const Lessons = () => {
                 <section>
                   <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                     <BookOpen className="w-5 h-5 text-green-600" />
-                    How We Use It in BuildFlow
+                    How We Use It in CompanAI
                   </h3>
                   <p className="text-gray-700 leading-relaxed">{selectedLesson.content.howWeUse}</p>
                 </section>
@@ -551,13 +551,13 @@ const Lessons = () => {
 
                   {/* Complete Button */}
                   <div className="flex justify-center">
-                    {completedLessons.includes(selectedLesson.id) ? (
-                      <div className="flex items-center gap-2 text-green-600">
-                        <CheckCircle className="w-5 h-5" />
-                        <span className="font-medium">Lesson Completed!</span>
-                      </div>
-                    ) : (
-                      <Button 
+                  {completedLessons.includes(selectedLesson.id) ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="font-medium">Lesson Completed!</span>
+                    </div>
+                  ) : (
+                    <Button 
                         onClick={() => {
                           completeLesson(selectedLesson.id);
                           // Auto-navigate to next lesson after completion
@@ -569,13 +569,13 @@ const Lessons = () => {
                             }, 1500);
                           }
                         }}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                        size="lg"
-                      >
-                        <CheckCircle className="w-5 h-5 mr-2" />
-                        Mark as Complete
-                      </Button>
-                    )}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                      size="lg"
+                    >
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Mark as Complete
+                    </Button>
+                  )}
                   </div>
 
                   {/* Next Lesson */}

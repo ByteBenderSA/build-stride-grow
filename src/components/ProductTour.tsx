@@ -23,7 +23,7 @@ const ProductTour = ({ isActive, onComplete, onSkip }: ProductTourProps) => {
       target: 'body',
       content: (
         <div>
-          <h3 className="text-lg font-semibold mb-2">Welcome to BuildFlow! 🚀</h3>
+                          <h3 className="text-lg font-semibold mb-2">Welcome to CompanAI! 🚀</h3>
           <p>Let's take a quick tour to help you get started. This will only take 2 minutes!</p>
         </div>
       ),

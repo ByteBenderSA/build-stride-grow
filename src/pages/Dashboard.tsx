@@ -11,6 +11,7 @@ import {
   getOnboardingConfig
 } from "@/lib/onboarding";
 import { getPersonalizedDashboard } from "@/lib/personalization";
+import { getUserSubscription, type SubscriptionStatus } from "@/lib/subscriptions";
 import type { Project } from "@/lib/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,13 +28,16 @@ import {
   Target,
   BookOpen,
   LogOut,
-  CheckCircle
+  CheckCircle,
+  Crown,
+  Rocket
 } from "lucide-react";
 import AIAssistant from "@/components/AIAssistant";
 import WelcomeModal, { type OnboardingPath } from "@/components/WelcomeModal";
 import ProductTour from "@/components/ProductTour";
 import PersonalizedRecommendations from "@/components/PersonalizedRecommendations";
 import ModeSwitch from "@/components/ModeSwitch";
+import { UsageDisplay } from "@/components/UsageDisplay";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -43,6 +47,7 @@ const Dashboard = () => {
   const [lessonsCompleted, setLessonsCompleted] = useState(0);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showProductTour, setShowProductTour] = useState(false);
+  const [userSubscription, setUserSubscription] = useState<SubscriptionStatus | null>(null);
 
   // Get user's onboarding path and configuration
   const onboardingPath = getUserOnboardingPath(user);
@@ -74,7 +79,7 @@ const Dashboard = () => {
     }))),
     {
       action: "Joined",
-      item: "BuildFlow Community",
+              item: "CompanAI Community",
       time: getTimeAgo(user?.createdAt || new Date().toISOString()),
       type: "achievement" as const
     }
@@ -97,9 +102,9 @@ const Dashboard = () => {
 
     // Check if user needs onboarding
     const checkOnboarding = async () => {
-      if (needsOnboarding(user)) {
-        setShowWelcomeModal(true);
-      }
+    if (needsOnboarding(user)) {
+      setShowWelcomeModal(true);
+    }
     };
     checkOnboarding();
 
@@ -121,7 +126,18 @@ const Dashboard = () => {
       }
     };
 
+    // Load user subscription
+    const loadUserSubscription = async () => {
+      try {
+        const subscription = await getUserSubscription(user.id);
+        setUserSubscription(subscription);
+      } catch (error) {
+        console.error('Error loading user subscription:', error);
+      }
+    };
+
     loadLessonProgress();
+    loadUserSubscription();
     return () => unsubscribe();
   }, [user]);
 
@@ -209,6 +225,18 @@ const Dashboard = () => {
       priority: onboardingConfig.prioritizeBuilder ? 1 : 2
     });
 
+    // Upgrade Plan - Show only for Free and Pro users, not Ultra users
+    if (userSubscription?.plan !== 'ultra') {
+      actions.push({
+        title: "Upgrade Plan",
+        description: "Unlock more AI ideas & interactions",
+        icon: Crown,
+        color: "from-purple-500 to-purple-600",
+        link: "/pricing",
+        priority: 3
+      });
+    }
+
     // Get Help
     actions.push({
       title: onboardingConfig.enableFriendlyTone ? "Get Help" : "AI Assistant",
@@ -256,6 +284,11 @@ const Dashboard = () => {
       </header>
 
       <div className="container mx-auto px-6 py-8">
+        {/* Usage Display - Mobile Only (Top) */}
+        <div className="lg:hidden mb-6">
+          <UsageDisplay compact={true} />
+        </div>
+        
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
@@ -429,6 +462,11 @@ const Dashboard = () => {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Usage & Plan - Desktop Only (Sidebar) */}
+            <div data-tour="usage-display" className="hidden lg:block">
+              <UsageDisplay compact={false} />
+            </div>
+
             {/* Recent Activity */}
             <Card className="shadow-lg border-0" data-tour="recent-activity">
               <CardHeader>
@@ -557,7 +595,7 @@ const Dashboard = () => {
       {/* Welcome Modal */}
       <WelcomeModal 
         isOpen={showWelcomeModal} 
-        onSelectPath={handleOnboardingPathSelection}
+        onSelectPath={handleOnboardingPathSelection} 
         onClose={() => setShowWelcomeModal(false)}
       />
 

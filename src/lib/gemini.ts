@@ -23,7 +23,7 @@ export interface ConversationContext {
 
 class GeminiService {
   private model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-  private readonly SYSTEM_PROMPT = `You are an expert AI coding mentor for BuildFlow, a platform that helps complete beginners learn to code through building real projects. Your role is to:
+  private readonly SYSTEM_PROMPT = `You are an expert AI coding mentor for CompanAI, a platform that helps complete beginners learn to code through building real projects. Your role is to:
 
 1. **Be encouraging and supportive** - Remember users are complete beginners
 2. **Provide actionable guidance** - Give specific, step-by-step instructions
@@ -245,6 +245,82 @@ Generate 3 distinct variations now:`;
     } catch (error) {
       console.error('Error generating long form prompt:', error);
       throw new Error('Failed to generate prompt. Please try again.');
+    }
+  }
+
+  async generateRefinedPrompt(
+    selectedIdea: any,
+    customization: {
+      colorScheme: string
+      layoutStyle: string
+      fontVibe: string
+      features: string[]
+      customFeatures: string
+      userFlow: string
+      customHexColor?: string
+    }
+  ): Promise<string> {
+    try {
+      const colorInfo = customization.colorScheme === 'custom' 
+        ? `Custom color: ${customization.customHexColor}`
+        : customization.colorScheme.replace('-', ' ');
+
+      const prompt = `You are an expert technical architect. Based on the selected app idea and user customizations, generate comprehensive development prompts for both Lovable.dev (frontend) and Cursor (backend).
+
+SELECTED APP IDEA:
+${JSON.stringify(selectedIdea, null, 2)}
+
+USER CUSTOMIZATIONS:
+- Color Scheme: ${colorInfo}
+- Layout Style: ${customization.layoutStyle}
+- Font Style: ${customization.fontVibe}
+- Selected Features: ${customization.features.join(', ')}
+- Custom Features: ${customization.customFeatures}
+- User Flow: ${customization.userFlow}
+
+Generate two detailed prompts:
+
+1. **LOVABLE.DEV PROMPT** (Frontend):
+Include specific:
+- Component structure based on layout style
+- Color scheme implementation (CSS variables, Tailwind classes)
+- Typography choices based on font vibe
+- Feature-specific UI components
+- User flow implementation
+- Responsive design considerations
+
+2. **CURSOR PROMPT** (Backend):
+Include specific:
+- Database schema for selected features
+- API endpoints needed
+- Authentication setup (if selected)
+- Feature-specific backend logic
+- Integration points with frontend
+
+Format the response as:
+
+## LOVABLE.DEV PROMPT
+[Detailed frontend prompt here]
+
+## CURSOR PROMPT  
+[Detailed backend prompt here]
+
+Make sure both prompts are comprehensive and actionable for AI tools to execute.`;
+
+      const result = await this.model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.8,
+          maxOutputTokens: 4000,
+        },
+      });
+      
+      return result.response.text();
+    } catch (error) {
+      console.error('Error generating refined prompt:', error);
+      throw new Error('Failed to generate refined prompts. Please try again.');
     }
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,11 +25,21 @@ import {
   Star,
   Brain,
   Sparkles,
-  Zap
+  Zap,
+  Copy,
+  Check,
+  ExternalLink,
+  Database
 } from "lucide-react";
 import { geminiService } from "@/lib/gemini";
 import { useAuth } from "@/contexts/AuthContext";
 import { createProject } from "@/lib/firestore";
+import { checkUsageLimit, incrementUsage } from '@/lib/subscriptions'
+import { UsageLimitModal } from '@/components/ui/usage-limit-modal'
+import { IdeaCustomizationForm } from '@/components/IdeaCustomizationForm'
+import { RefinedPrompts } from '@/components/RefinedPrompts'
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
 
 interface GeneratedIdea {
   id: number;
@@ -213,20 +223,21 @@ const IdeaCardSkeleton = () => (
 const IdeaWorkshop = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState<'input' | 'ideas' | 'customize' | 'prompts'>('input');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isRefining, setIsRefining] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const [formData, setFormData] = useState({
     appName: "",
-    appDescription: "",
+    description: "",
     targetAudience: "",
     keyFeatures: "",
-    userFlow: "",
-    experience: "",
-    timeCommitment: ""
+    skillLevel: "beginner"
   });
   const [generatedIdeas, setGeneratedIdeas] = useState<GeneratedIdea[]>([]);
   const [selectedIdea, setSelectedIdea] = useState<GeneratedIdea | null>(null);
+  const [refinedPrompts, setRefinedPrompts] = useState<string>("");
 
   const parseAIResponse = (response: string, index: number): GeneratedIdea => {
     console.log('Raw AI Response:', response);
@@ -421,610 +432,446 @@ const IdeaWorkshop = () => {
   };
 
   const handleGenerateIdeas = async () => {
+    if (!user) return;
+    
+    // Check usage limit before generating
+    const limitCheck = await checkUsageLimit(user.uid, 'idea');
+    if (!limitCheck.canUse) {
+      setShowLimitModal(true);
+      return;
+    }
+    
+    // Increment usage counter
+    const success = await incrementUsage(user.uid, 'idea');
+    if (!success) {
+      setShowLimitModal(true);
+      return;
+    }
+    
     if (!formData.appName.trim()) return;
 
     setIsGenerating(true);
-    setError(null);
-    setStep(2);
-
     try {
-      const userInput = `
-        App Name: ${formData.appName}
-        App Description: ${formData.appDescription}
-        Target Audience: ${formData.targetAudience}
-        Key Features: ${formData.keyFeatures}
-        User Flow: ${formData.userFlow}
-        Experience Level: ${formData.experience}
-        Time Commitment: ${formData.timeCommitment}
-      `;
+      const userInput = `App Name: ${formData.appName}
+Description: ${formData.description}
+Target Audience: ${formData.targetAudience}
+Key Features: ${formData.keyFeatures}
+Skill Level: ${formData.skillLevel}`;
 
-                   const response = await geminiService.generateProjectIdea(userInput);
-      console.log('Raw Gemini Response:', response);
-
-      // Parse the ideas from the response
-      let ideas: GeneratedIdea[] = [];
+      const response = await geminiService.generateProjectIdea(userInput, formData.skillLevel);
+      const ideas = response.split("---").map((idea, index) => parseAIResponse(idea.trim(), index));
       
-      try {
-        // First try to parse as a single JSON array
-        let jsonData = null;
-        
-        // Try to extract JSON array from the response
-        const jsonExtractionStrategies = [
-          // Strategy 1: Direct JSON array
-          () => JSON.parse(response.trim()),
-          
-          // Strategy 2: JSON array in code blocks
-          () => {
-            const codeBlockMatch = response.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
-            return codeBlockMatch ? JSON.parse(codeBlockMatch[1]) : null;
-          },
-          
-          // Strategy 3: Extract JSON array content
-          () => {
-            const jsonMatch = response.match(/(\[[\s\S]*\])/);
-            return jsonMatch ? JSON.parse(jsonMatch[1]) : null;
-          }
-        ];
-
-        // Try each extraction strategy
-        for (const strategy of jsonExtractionStrategies) {
-          try {
-            jsonData = strategy();
-            if (Array.isArray(jsonData) && jsonData.length > 0) {
-              console.log('Successfully extracted JSON array:', jsonData);
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-
-        // If we got a JSON array, process each idea
-        if (Array.isArray(jsonData)) {
-          ideas = jsonData.map((ideaData, index) => {
-            const validateField = (field: any, fallback: any) => {
-              return field && (typeof field === typeof fallback) ? field : fallback;
-            };
-
-            const validateArray = (arr: any, fallback: any[], maxLength = 10) => {
-              if (Array.isArray(arr) && arr.length > 0) {
-                return arr.filter(item => typeof item === 'string' && item.trim().length > 0).slice(0, maxLength);
-              }
-              return fallback;
-            };
-
-            const validateDifficulty = (diff: any): 'Beginner' | 'Intermediate' | 'Advanced' => {
-              const validDifficulties = ['Beginner', 'Intermediate', 'Advanced'];
-              return validDifficulties.includes(diff) ? diff : 'Beginner';
-            };
-
-            return {
-              id: index + 1,
-              title: validateField(ideaData.title, `Project Idea ${index + 1}`),
-              description: validateField(ideaData.description, "A modern web application with innovative features."),
-              difficulty: validateDifficulty(ideaData.difficulty),
-              timeEstimate: validateField(ideaData.timeEstimate, "2-3 weeks"),
-              techStack: validateArray(ideaData.techStack, ["React", "TypeScript", "Tailwind CSS", "Firebase"], 6),
-              marketPotential: validateField(ideaData.marketPotential, "Medium"),
-              features: validateArray(ideaData.features, ["User Interface", "Data Management", "User Authentication", "Responsive Design"], 8),
-              learningObjectives: validateArray(ideaData.learningObjectives, ["React Development", "Database Integration", "UI/UX Design"], 6),
-              why: `Perfect for learning ${ideaData.learningObjectives?.slice(0, 2).join(" and ") || "development skills"}`,
-              roadmap: ["UI Design & Planning", "Core Feature Development", "Database Integration", "Testing & Polish", "Deployment & Launch"]
-            };
-          }).filter(idea => idea.title && idea.description);
-        } else {
-          // Fallback to splitting by --- if not a JSON array
-          console.log('Not a JSON array, trying to split by ---');
-          ideas = response.split('---').map((ideaText, index) => 
-            parseAIResponse(ideaText.trim(), index)
-          ).filter(idea => idea.title && idea.description);
-        }
-      } catch (parseError) {
-        console.error('Error parsing JSON response:', parseError);
-        // Fallback to splitting by --- if JSON parsing fails
-        ideas = response.split('---').map((ideaText, index) => 
-          parseAIResponse(ideaText.trim(), index)
-        ).filter(idea => idea.title && idea.description);
-      }
-
-      // Ensure we have at least 3 ideas
-      const finalIdeas = ideas.length >= 3 ? ideas.slice(0, 3) : [
-        ...ideas,
-        ...Array(3 - ideas.length).fill(null).map((_, index) => ({
-          id: ideas.length + index + 1,
-          title: `Custom Project ${ideas.length + index + 1}`,
-          description: "A tailored project based on your interests and skill level.",
-          difficulty: 'Beginner' as const,
-          timeEstimate: "2-3 weeks",
-          techStack: ["React", "TypeScript", "Tailwind CSS", "Firebase"],
-          marketPotential: "Medium",
-          features: ["User Interface", "Data Management", "User Authentication", "Responsive Design"],
-          why: "Perfect for building practical development skills",
-          learningObjectives: ["React Development", "Database Integration", "UI/UX Design"],
-          roadmap: ["Setup", "Development", "Testing", "Deployment"]
-        }))
-      ];
-
-      setGeneratedIdeas(finalIdeas);
-    } catch (err) {
-      console.error('Error generating ideas:', err);
-      setError('Failed to generate ideas. Please try again.');
-      setStep(1);
+      setGeneratedIdeas(ideas);
+      setCurrentStep('ideas');
+    } catch (error) {
+      console.error("Error generating ideas:", error);
     } finally {
-      // Add a minimum delay to show the loading animation
-      setTimeout(() => {
       setIsGenerating(false);
-      }, 3000);
     }
   };
 
-  const handleSelectIdea = async (idea: GeneratedIdea) => {
-    if (!user) return;
-    
+  const handleIdeaSelection = (idea: GeneratedIdea) => {
+    setSelectedIdea(idea);
+    setCurrentStep('customize');
+  };
+
+  const handleCustomizationSubmit = async (customization: any) => {
+    if (!selectedIdea || !user) return;
+
+    setIsRefining(true);
     try {
-      const projectId = await createProject({
-        ownerId: user.id,
+      const refinedPromptResponse = await geminiService.generateRefinedPrompt(selectedIdea, customization);
+      setRefinedPrompts(refinedPromptResponse);
+      setCurrentStep('prompts');
+    } catch (error) {
+      console.error("Error generating refined prompts:", error);
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
+  const handleSaveAsProject = async (idea: GeneratedIdea) => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      let prompts = { lovable: undefined, cursor: undefined };
+      
+      // If we have refined prompts (from customization flow), use them
+      if (refinedPrompts) {
+        const parsedPrompts = refinedPrompts.split('## CURSOR PROMPT');
+        prompts.lovable = parsedPrompts[0]?.replace('## LOVABLE.DEV PROMPT', '').trim();
+        prompts.cursor = parsedPrompts[1]?.trim();
+      } else {
+        // Create basic template prompts for quick save path (no API calls)
+        prompts.lovable = `Create a ${idea.title} application with the following specifications:
+
+**Project Overview:**
+${idea.description}
+
+**Key Features:**
+${idea.features.map(feature => `- ${feature}`).join('\n')}
+
+**Tech Stack:**
+${idea.techStack.map(tech => `- ${tech}`).join('\n')}
+
+**UI Requirements:**
+- Modern, clean design with purple/blue color scheme
+- Responsive layout that works on desktop and mobile
+- Dashboard-style layout with sidebar navigation
+- Use Tailwind CSS for styling
+- Include proper TypeScript types
+
+**Core Components Needed:**
+- Authentication system (login/signup)
+- Main dashboard
+- Navigation component
+- User profile management
+- ${idea.features.slice(0, 3).map(feature => `- ${feature} component`).join('\n')}
+
+**Styling Guidelines:**
+- Use gradient backgrounds (purple to blue)
+- Modern card-based layouts
+- Proper spacing and typography
+- Hover effects and smooth transitions
+- Accessible color contrasts
+
+Please create a complete, production-ready frontend application with proper component structure, routing, and state management.`;
+
+        prompts.cursor = `Implement the backend for ${idea.title} with the following requirements:
+
+**Project Overview:**
+${idea.description}
+
+**Database Schema:**
+Design tables/collections for:
+- Users (authentication, profiles)
+- ${idea.features.slice(0, 4).map(feature => `- ${feature.toLowerCase().replace(/\s+/g, '_')} data`).join('\n')}
+
+**API Endpoints:**
+- Authentication (register, login, logout)
+- User management (profile, settings)
+- ${idea.features.slice(0, 3).map(feature => `- ${feature} CRUD operations`).join('\n')}
+
+**Tech Stack:**
+${idea.techStack.filter(tech => !['React', 'TypeScript', 'Tailwind CSS'].includes(tech)).map(tech => `- ${tech}`).join('\n')}
+- RESTful API design
+- JWT authentication
+- Input validation and sanitization
+- Error handling and logging
+
+**Security Requirements:**
+- Password hashing (bcrypt)
+- JWT token management
+- Input validation
+- CORS configuration
+- Rate limiting
+
+**Features to Implement:**
+${idea.features.map(feature => `- ${feature}`).join('\n')}
+
+Please implement a secure, scalable backend with proper error handling, validation, and documentation.`;
+      }
+
+      const projectData = {
         title: idea.title,
         description: idea.description,
         category: 'AI Generated',
         difficulty: idea.difficulty,
-        techStack: idea.techStack,
-        features: idea.features,
         timeEstimate: idea.timeEstimate,
+        techStack: idea.techStack,
         marketPotential: idea.marketPotential as 'Low' | 'Medium' | 'High',
-        status: 'planning',
+        features: idea.features,
+        ownerId: user.id,
+        status: 'planning' as const,
         progress: {
           currentStep: 0,
-          totalSteps: idea.roadmap.length,
           completedSteps: [],
+          totalSteps: idea.roadmap.length,
           lastWorkedOn: new Date().toISOString()
         },
         prompts: {
-          lovable: `Create a modern, responsive web application called "${idea.title}":
-
-**App Overview:** ${idea.description}
-
-**Target Users:** ${formData.targetAudience}
-
-**Core User Experience:**
-${formData.userFlow}
-
-**Essential Features to Include:**
-${idea.features.map(feature => `• ${feature}`).join('\n')}
-
-**Design Requirements:**
-• Clean, modern UI with intuitive navigation
-• Mobile-responsive design
-• Professional color scheme and typography
-• User-friendly forms and interactions
-• Loading states and feedback
-• Accessible design principles
-
-**Key Pages/Screens:**
-• Landing/welcome page
-• User authentication (login/signup)
-• Main application interface
-• User dashboard/profile
-• Settings/preferences
-
-**Technical Specs:**
-• Use React with TypeScript
-• Implement responsive design with Tailwind CSS
-• Include proper routing and navigation
-• Add form validation and error handling
-• Ensure mobile-first responsive layout
-
-Focus on creating an engaging, professional frontend that delivers excellent user experience.`,
-          
-          cursor: `I'm building "${idea.title}" - ${idea.description}
-
-**My Experience Level:** ${formData.experience}
-**Target Audience:** ${formData.targetAudience}
-
-**Application Architecture Needed:**
-${idea.features.map(feature => `• ${feature}`).join('\n')}
-
-**User Flow to Implement:**
-${formData.userFlow}
-
-**Technical Implementation Help Needed:**
-
-1. **Backend Setup & Database:**
-   - Firebase configuration and setup
-   - Database schema design for user data
-   - Authentication implementation
-   - Data security and validation rules
-
-2. **API Integration:**
-   - RESTful API design patterns
-   - Error handling and data validation
-   - Real-time data synchronization
-   - Third-party service integration
-
-3. **Frontend Logic:**
-   - State management best practices
-   - Component architecture and reusability
-   - Form handling and validation
-   - User experience optimization
-
-4. **Code Quality & Best Practices:**
-   - TypeScript implementation
-   - Code organization and file structure
-   - Testing strategies
-   - Performance optimization
-   - Security considerations
-
-**Specific Areas I Need Guidance On:**
-- Code architecture and project structure
-- Implementation of complex features
-- Best practices for ${idea.techStack.join(', ')}
-- Debugging and troubleshooting
-- Code review and optimization
-
-Please provide step-by-step guidance, code examples, and explain the reasoning behind technical decisions.`
+          lovable: prompts.lovable,
+          cursor: prompts.cursor
         },
         resources: {
           links: [],
           tutorials: [],
-          documentation: idea.techStack.map(tech => `${tech} documentation`)
+          documentation: []
         }
-      });
+      };
 
-      setSelectedIdea({ ...idea, projectId });
-      setStep(3);
+      const projectId = await createProject(projectData);
+      
+      // Update the idea with the project ID
+      setGeneratedIdeas(prev => 
+        prev.map(prevIdea => 
+          prevIdea.id === idea.id 
+            ? { ...prevIdea, projectId }
+            : prevIdea
+        )
+      );
+
+      navigate('/workspace');
     } catch (error) {
-      console.error('Error creating project:', error);
-      setError('Failed to save project. Please try again.');
+      console.error("Error saving project:", error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const difficultyColors = {
-    'Beginner': 'bg-green-100 text-green-700',
-    'Intermediate': 'bg-yellow-100 text-yellow-700', 
-    'Advanced': 'bg-red-100 text-red-700'
+  const handleStartOver = () => {
+    setCurrentStep('input');
+    setFormData({
+      appName: "",
+      description: "",
+      targetAudience: "",
+      keyFeatures: "",
+      skillLevel: "beginner"
+    });
+    setGeneratedIdeas([]);
+    setSelectedIdea(null);
+    setRefinedPrompts("");
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
-      <div className="container mx-auto px-6 py-8">
-      {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Link to="/dashboard">
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-              </Button>
-          </Link>
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                AI Idea Workshop
-              </h1>
-              <p className="text-gray-600 mt-1">Transform your vision into a detailed development plan</p>
-            </div>
-          </div>
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 'input':
+        return renderInputForm();
+      case 'ideas':
+        return renderIdeasSelection();
+      case 'customize':
+        return renderCustomization();
+      case 'prompts':
+        return renderRefinedPrompts();
+      default:
+        return renderInputForm();
+    }
+  };
+
+  const renderInputForm = () => (
+    <Card className="max-w-2xl mx-auto border-0 shadow-lg">
+      <CardHeader className="text-center">
+        <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+          <Lightbulb className="w-6 h-6 text-yellow-500" />
+          Tell Us About Your App Idea
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <Label htmlFor="appName" className="text-base font-medium">App Name</Label>
+          <Input
+            id="appName"
+            placeholder="e.g., FitTracker Pro"
+            value={formData.appName}
+            onChange={(e) => setFormData(prev => ({ ...prev, appName: e.target.value }))}
+            className="mt-1"
+          />
         </div>
 
-        {error && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-700">
-              {error}
-            </AlertDescription>
-          </Alert>
-        )}
+        <div>
+          <Label htmlFor="description" className="text-base font-medium">Description</Label>
+          <Textarea
+            id="description"
+            placeholder="Describe your app idea in a few sentences..."
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            className="mt-1 min-h-[100px]"
+          />
+        </div>
 
-        {/* Step 1: Input Form */}
-        {step === 1 && (
-          <div className="max-w-2xl mx-auto">
-            <Card className="shadow-xl border-0">
-              <CardHeader className="text-center bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
-                <CardTitle className="text-2xl flex items-center justify-center gap-2">
-                  <Lightbulb className="w-6 h-6" />
-                  Tell us about your vision
-                </CardTitle>
-                <p className="mt-2 opacity-90">The more details you share, the better ideas we can generate</p>
-              </CardHeader>
-              <CardContent className="p-8 space-y-6">
-                <div>
-                  <Label htmlFor="appName" className="text-base font-semibold">
-                    App Name *
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">
-                    What's the name of your app?
-                  </p>
-                  <Input
-                    id="appName"
-                    placeholder="e.g., FitTrack, RecipeShare, LocalBizFinder, FinTrack..."
-                    value={formData.appName}
-                    onChange={(e) => setFormData({...formData, appName: e.target.value})}
-                    className="mt-1"
-                    disabled={isGenerating}
-                  />
-                </div>
+        <div>
+          <Label htmlFor="targetAudience" className="text-base font-medium">Target Audience</Label>
+          <Input
+            id="targetAudience"
+            placeholder="e.g., Fitness enthusiasts, busy professionals"
+            value={formData.targetAudience}
+            onChange={(e) => setFormData(prev => ({ ...prev, targetAudience: e.target.value }))}
+            className="mt-1"
+          />
+        </div>
 
-                <div>
-                  <Label htmlFor="appDescription" className="text-base font-semibold">
-                    App Description *
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Describe your app in a few sentences
-                  </p>
-                  <Textarea
-                    id="appDescription"
-                    placeholder="e.g., A fitness tracking app that helps users achieve their goals..."
-                    value={formData.appDescription}
-                    onChange={(e) => setFormData({...formData, appDescription: e.target.value})}
-                    className="mt-1 min-h-[100px]"
-                    disabled={isGenerating}
-                  />
-                </div>
+        <div>
+          <Label htmlFor="keyFeatures" className="text-base font-medium">Key Features</Label>
+          <Textarea
+            id="keyFeatures"
+            placeholder="What are the main features you want in your app?"
+            value={formData.keyFeatures}
+            onChange={(e) => setFormData(prev => ({ ...prev, keyFeatures: e.target.value }))}
+            className="mt-1"
+          />
+        </div>
 
-                <div>
-                  <Label htmlFor="targetAudience" className="text-base font-semibold">
-                    Target Audience *
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Who are you designing this app for?
-                  </p>
-                  <Input
-                    id="targetAudience"
-                    placeholder="e.g., fitness enthusiasts, recipe lovers, local business owners, personal finance managers..."
-                    value={formData.targetAudience}
-                    onChange={(e) => setFormData({...formData, targetAudience: e.target.value})}
-                    className="mt-1"
-                    disabled={isGenerating}
-                  />
-                </div>
+        <div>
+          <Label className="text-base font-medium mb-3 block">Your Coding Experience</Label>
+          <RadioGroup
+            value={formData.skillLevel}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, skillLevel: value }))}
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="beginner" id="beginner" />
+              <Label htmlFor="beginner">Beginner - I'm just starting out</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="intermediate" id="intermediate" />
+              <Label htmlFor="intermediate">Intermediate - I have some experience</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="advanced" id="advanced" />
+              <Label htmlFor="advanced">Advanced - I'm comfortable with coding</Label>
+            </div>
+          </RadioGroup>
+        </div>
 
-                <div>
-                  <Label htmlFor="keyFeatures" className="text-base font-semibold">
-                    Key Features *
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">
-                    What are the main features of your app?
-                  </p>
-                  <Textarea
-                    id="keyFeatures"
-                    placeholder="e.g., user registration, data input, real-time updates, responsive design..."
-                    value={formData.keyFeatures}
-                    onChange={(e) => setFormData({...formData, keyFeatures: e.target.value})}
-                    className="mt-1 min-h-[100px]"
-                    disabled={isGenerating}
-                  />
-                </div>
+        <Button
+          onClick={handleGenerateIdeas}
+          disabled={isGenerating || !formData.appName.trim()}
+          className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white py-6 text-lg"
+        >
+          {isGenerating ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2" />
+              Generating Ideas...
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-5 h-5 mr-2" />
+              Generate App Ideas
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
-                <div>
-                  <Label htmlFor="userFlow" className="text-base font-semibold">
-                    User Flow *
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Describe the typical user flow of your app
-                  </p>
-                                     <Textarea
-                     id="userFlow"
-                     placeholder="e.g., 1. User signs up with email, 2. They upload a topic or ask a question, 3. AI processes and gives explanation, 4. User can review chat history..."
-                     value={formData.userFlow}
-                     onChange={(e) => setFormData({...formData, userFlow: e.target.value})}
-                     className="mt-1 min-h-[100px]"
-                     disabled={isGenerating}
-                   />
-                </div>
+  const renderIdeasSelection = () => (
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="text-center">
+        <h2 className="text-3xl font-bold mb-2">Choose Your App Concept</h2>
+        <p className="text-gray-600">Select the variation that best matches your vision</p>
+      </div>
 
-                <div>
-                  <Label htmlFor="experience" className="text-base font-semibold">
-                    What's your development experience?
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Help us tailor the complexity to your skill level
-                  </p>
-                  <Input
-                    id="experience"
-                    placeholder="e.g., complete beginner, some HTML/CSS, built a few projects..."
-                    value={formData.experience}
-                    onChange={(e) => setFormData({...formData, experience: e.target.value})}
-                    className="mt-1"
-                    disabled={isGenerating}
-                  />
-                </div>
+      <div className="grid md:grid-cols-3 gap-6">
+        {generatedIdeas.map((idea, index) => (
+          <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => handleIdeaSelection(idea)}>
+            <CardHeader>
+              <CardTitle className="text-xl">{idea.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-gray-600">{idea.description}</p>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Key Features:</h4>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {idea.features.slice(0, 4).map((feature, i) => (
+                    <li key={i} className="flex items-start">
+                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-2 mr-2 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-                <div>
-                  <Label htmlFor="timeCommitment" className="text-base font-semibold">
-                    How much time can you dedicate?
-                  </Label>
-                  <p className="text-sm text-gray-600 mb-2">
-                    This helps us scope the project appropriately
-                  </p>
-                  <Input
-                    id="timeCommitment"
-                    placeholder="e.g., 2-3 hours per week, evenings only, full-time..."
-                    value={formData.timeCommitment}
-                    onChange={(e) => setFormData({...formData, timeCommitment: e.target.value})}
-                    className="mt-1"
-                    disabled={isGenerating}
-                  />
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {idea.techStack.slice(0, 3).map((tech, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">{tech}</Badge>
+                ))}
+              </div>
 
+              <div className="flex gap-2">
                 <Button 
-                  onClick={handleGenerateIdeas}
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                  size="lg"
-                  disabled={isGenerating || !formData.appName.trim()}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
+                  onClick={() => handleIdeaSelection(idea)}
                 >
-                  {isGenerating ? (
+                  Customize & Build
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="px-4"
+                  onClick={() => handleSaveAsProject(idea)}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating Your Ideas...
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                      Saving...
                     </>
                   ) : (
-                    <>
-                      <Wand2 className="w-4 h-4 mr-2" />
-                      Generate Perfect Ideas
-                    </>
+                    'Save as Project'
                   )}
                 </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Step 2: Generated Ideas */}
-        {step === 2 && (
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold mb-2">Here are your personalized project ideas!</h2>
-              <p className="text-gray-600">Each idea is tailored to your interests and skill level</p>
-            </div>
-
-            {isGenerating ? (
-              <IdeaGenerationLoader />
-            ) : (
-              <div className="grid gap-6">
-                {generatedIdeas.map((idea) => (
-                <Card key={idea.id} className="shadow-lg border-0 hover:shadow-xl transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold mb-2">{idea.title}</h3>
-                        <p className="text-gray-600 mb-4">{idea.description}</p>
-                      </div>
-                      <Badge className={difficultyColors[idea.difficulty as keyof typeof difficultyColors]}>
-                        {idea.difficulty}
-                      </Badge>
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-4 mb-6">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm">{idea.timeEstimate}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                        <span className="text-sm">Market: {idea.marketPotential}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm">Community Favorite</span>
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <h4 className="font-semibold mb-2">Tech Stack:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {idea.techStack.map((tech: string, index: number) => (
-                          <Badge key={index} variant="outline">{tech}</Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <h4 className="font-semibold mb-2">Key Features:</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {idea.features.map((feature: string, index: number) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-600" />
-                            <span className="text-sm">{feature}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                      <h4 className="font-semibold text-blue-900 mb-1">Why this project?</h4>
-                      <p className="text-sm text-blue-800">{idea.why}</p>
-                    </div>
-
-                    <Button 
-                      onClick={() => handleSelectIdea(idea)}
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                    >
-                      Choose This Project <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
               </div>
-            )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-            {!isGenerating && generatedIdeas.length > 0 && (
-              <div className="text-center mt-8">
-                <Button 
-                  onClick={handleGenerateIdeas}
-                  variant="outline"
-                  size="lg"
-                  disabled={isGenerating}
-                >
-                  <Wand2 className="w-4 h-4 mr-2" />
-                  Generate New Ideas
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
+      <div className="text-center">
+        <Button variant="outline" onClick={handleStartOver}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Start Over
+        </Button>
+      </div>
+    </div>
+  );
 
-        {/* Step 3: Project Selected */}
-        {step === 3 && selectedIdea && (
-          <div className="max-w-3xl mx-auto">
-            <Card className="shadow-xl border-0">
-              <CardHeader className="text-center bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-lg">
-                <CardTitle className="text-2xl">Perfect! Let's start building</CardTitle>
-                <p className="mt-2 opacity-90">Your project has been saved and you're ready to begin</p>
-              </CardHeader>
-              <CardContent className="p-8">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">{selectedIdea.title}</h3>
-                  <p className="text-gray-600">{selectedIdea.description}</p>
-                </div>
+  const renderCustomization = () => (
+    <div>
+      <div className="text-center mb-6">
+        <Button variant="outline" onClick={() => setCurrentStep('ideas')} className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Ideas
+        </Button>
+      </div>
+      
+      <IdeaCustomizationForm
+        selectedIdea={selectedIdea}
+        onSubmit={handleCustomizationSubmit}
+        isLoading={isRefining}
+      />
+    </div>
+  );
 
-                <div className="grid md:grid-cols-2 gap-6 mb-8">
-                  <div>
-                    <h4 className="font-semibold mb-3">What you'll build:</h4>
-                    <div className="space-y-2">
-                      {selectedIdea.features.map((feature: string, index: number) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600" />
-                          <span className="text-sm">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-3">What you'll learn:</h4>
-                    <div className="space-y-2">
-                      {selectedIdea.learningObjectives.map((objective: string, index: number) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Star className="w-4 h-4 text-yellow-600" />
-                          <span className="text-sm">{objective}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+  const renderRefinedPrompts = () => (
+    <RefinedPrompts
+      prompts={refinedPrompts}
+      selectedIdea={selectedIdea}
+      onStartOver={handleStartOver}
+      onSaveAsProject={() => selectedIdea && handleSaveAsProject(selectedIdea)}
+    />
+  );
 
-                <div className="flex gap-4 justify-center">
-                  <Button 
-                    onClick={() => navigate('/workspace')}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-                    size="lg"
-                  >
-                    <Rocket className="w-4 h-4 mr-2" />
-                    Start Building Now
-                  </Button>
-                  <Button 
-                    onClick={() => navigate('/dashboard')}
-                    variant="outline"
-                    size="lg"
-                  >
-                    Back to Dashboard
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 py-12">
+      <div className="container mx-auto px-6">
+        <div className="text-center mb-8">
+          <Link to="/dashboard">
+            <Button variant="outline" className="mb-6">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+          
+          <Badge className="mb-4 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 border-purple-200 px-4 py-2">
+            <Zap className="w-4 h-4 mr-2" />
+            AI-Powered Idea Workshop
+          </Badge>
+          
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            Transform Your Idea
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Get professional development prompts tailored to your vision
+          </p>
+        </div>
+
+        {renderCurrentStep()}
+
+        <UsageLimitModal 
+          isOpen={showLimitModal}
+          onClose={() => setShowLimitModal(false)}
+          type="idea"
+        />
       </div>
     </div>
   );

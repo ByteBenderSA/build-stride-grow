@@ -1,4 +1,4 @@
-# BuildFlow Dual-Path Onboarding Implementation Plan
+# CompanAI Dual-Path Onboarding Implementation Plan
 
 ---
 

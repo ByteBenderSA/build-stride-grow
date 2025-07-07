@@ -107,7 +107,7 @@ const generateRecommendations = (
         title: 'Start Your Learning Journey',
         description: 'Begin with the tech essentials to understand the tools that power modern apps.',
         priority: 'high',
-        urgency: 'Start your BuildFlow journey!',
+        urgency: 'Start your CompanAI journey!',
         action: {
           label: 'Take First Lesson',
           link: '/lessons'
@@ -180,7 +180,7 @@ const generatePrimaryMessage = (
 ): DashboardPersonalization['primaryMessage'] => {
   if (!analysis) {
     return {
-      title: 'Welcome to BuildFlow!',
+      title: 'Welcome to CompanAI!',
       subtitle: 'Let\'s get you started.',
       type: 'prompt'
     };
@@ -307,7 +307,7 @@ const determineHighlightedSection = (
 // Default personalization for edge cases
 const getDefaultPersonalization = (): DashboardPersonalization => ({
   primaryMessage: {
-    title: 'Welcome to BuildFlow!',
+    title: 'Welcome to CompanAI!',
     subtitle: 'Let\'s get you started on your development journey.',
     type: 'prompt'
   },
@@ -316,7 +316,7 @@ const getDefaultPersonalization = (): DashboardPersonalization => ({
       id: 'get-started',
       type: 'action',
       title: 'Get Started',
-      description: 'Begin your journey with BuildFlow',
+      description: 'Begin your journey with CompanAI',
       priority: 'high',
       action: {
         label: 'Start Learning',

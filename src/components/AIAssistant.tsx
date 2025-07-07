@@ -9,6 +9,8 @@ import { conversationService, Message as ConversationMessage } from "@/lib/conve
 import { geminiService, ChatMessage } from "@/lib/gemini";
 import { Timestamp } from "firebase/firestore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { checkUsageLimit, incrementUsage } from '@/lib/subscriptions'
+import { UsageLimitModal } from '@/components/ui/usage-limit-modal'
 
 interface AIAssistantProps {
   onClose: () => void;
@@ -30,6 +32,7 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
@@ -116,7 +119,23 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
   };
 
   const handleSendMessage = async (content: string) => {
-    if (!content.trim() || !conversationId || !user || isLoading) return;
+    if (!user) return;
+    
+    // Check usage limit before sending message
+    const limitCheck = await checkUsageLimit(user.uid, 'ai');
+    if (!limitCheck.canUse) {
+      setShowLimitModal(true);
+      return;
+    }
+    
+    // Increment usage counter
+    const success = await incrementUsage(user.uid, 'ai');
+    if (!success) {
+      setShowLimitModal(true);
+      return;
+    }
+    
+    if (!content.trim() || !conversationId || isLoading) return;
 
     try {
       setIsLoading(true);
@@ -362,6 +381,12 @@ const AIAssistant = ({ onClose }: AIAssistantProps) => {
           </div>
         </CardContent>
       </Card>
+
+      <UsageLimitModal 
+        isOpen={showLimitModal}
+        onClose={() => setShowLimitModal(false)}
+        type="ai"
+      />
     </div>
   );
 };

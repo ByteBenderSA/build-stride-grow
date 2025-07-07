@@ -296,7 +296,7 @@ const WorkflowGuide = ({ project, currentStep, totalSteps, completedSteps }: Wor
               "Open Cursor's terminal (View → Terminal)",
               "Paste the GitHub HTTPS URL you copied and run: git clone [your-url]",
               "Open the cloned project folder in Cursor",
-              "Go back to BuildFlow and copy your Cursor AI prompt",
+                                "Go back to CompanAI and copy your Cursor AI prompt",
               "In Cursor, open AI chat (Ctrl/Cmd + L) and paste your prompt",
               "Follow AI suggestions to add Firebase integration and backend features",
               "Test all functionality works correctly",
@@ -350,12 +350,12 @@ const WorkflowGuide = ({ project, currentStep, totalSteps, completedSteps }: Wor
         </CardContent>
       </Card>
 
-      {/* Interactive BuildFlow Journey */}
+              {/* Interactive CompanAI Journey */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Rocket className="w-5 h-5" />
-            Your BuildFlow Journey
+            Your CompanAI Journey
           </CardTitle>
           <p className="text-sm text-gray-600">Click each step to get detailed instructions and track your progress</p>
         </CardHeader>

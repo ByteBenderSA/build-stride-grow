@@ -18,6 +18,19 @@
     <meta name="twitter:title" content="Build Apps in 24 Hours with AI" />
     <meta name="twitter:description" content="Professional AI prompts for Lovable and Cursor. From idea to deployed app fast." />
     <meta name="twitter:image" content="/placeholder.svg" />
+    
+    <!-- Yoco Payment SDK -->
+    <script src="https://js.yoco.com/sdk/v1/yoco-sdk-web.js"></script>
+    
+    <!-- Yoco Modal Z-Index Fix -->
+    <style>
+      /* Ensure Yoco modals appear on top of everything */
+      .yoco-popup-overlay,
+      .yoco-popup-container,
+      [id^="yc-checkout-container"] {
+        z-index: 9999 !important;
+      }
+    </style>
   </head>
 
   <body>

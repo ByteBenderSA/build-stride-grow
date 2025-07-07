@@ -21,7 +21,7 @@ const Signup = () => {
       console.log('🔍 Attempting signup with:', { email, name, passwordLength: password.length });
       await signup(email, password, name);
       toast({
-        title: "Welcome to BuildFlow!",
+        title: "Welcome to CompanAI!",
         description: "Your account has been created successfully.",
       });
       navigate("/dashboard");
@@ -50,7 +50,7 @@ const Signup = () => {
                 <Code className="w-4 h-4 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                BuildFlow
+                CompanAI
               </span>
             </div>
             <CardTitle className="text-2xl font-bold">Start your journey</CardTitle>

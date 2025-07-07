@@ -562,7 +562,7 @@ Make both prompts specific to the actual features and functionality. Ensure the 
         completed: false,
         content: {
           instructions: `
-🚀 **Welcome to BuildFlow!**
+🚀 **Welcome to CompanAI!**
 
 Ready to build your first app? Head to the **Idea Workshop** to generate your personalized project with AI assistance.
 
@@ -811,7 +811,7 @@ npm run dev
 \`\`\`
 
 ## 🤝 Contributing
-Built as part of BuildFlow learning journey.
+Built as part of CompanAI learning journey.
 
 ## 📄 License
 MIT License
@@ -1223,7 +1223,7 @@ This project taught me the power of combining AI tools (Lovable, Cursor) with tr
 Live demo: https://${projectSlug}.web.app
 Code: https://github.com/YOUR-USERNAME/${projectSlug}
 
-#WebDevelopment #AI #React #Firebase #BuildFlow
+#WebDevelopment #AI #React #Firebase #CompanAI
 
 ### **Twitter:**
 Just deployed my ${project.title}! 🚀
@@ -1594,12 +1594,12 @@ Live: https://${projectSlug}.web.app
                               const url = resourceUrls[resource] || `https://www.google.com/search?q=${encodeURIComponent(resource)}`;
                               
                               return (
-                                <Card key={index} className="hover:shadow-md transition-shadow">
-                                  <CardContent className="p-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <Book className="w-5 h-5 text-blue-600" />
-                                      <span className="font-medium">{resource}</span>
-                                    </div>
+                              <Card key={index} className="hover:shadow-md transition-shadow">
+                                <CardContent className="p-4 flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <Book className="w-5 h-5 text-blue-600" />
+                                    <span className="font-medium">{resource}</span>
+                                  </div>
                                     <a 
                                       href={url}
                                       target="_blank"
@@ -1607,11 +1607,11 @@ Live: https://${projectSlug}.web.app
                                       className="inline-flex"
                                     >
                                       <Button size="sm" variant="ghost" className="hover:bg-blue-50">
-                                        <ExternalLink className="w-4 h-4" />
-                                      </Button>
+                                    <ExternalLink className="w-4 h-4" />
+                                  </Button>
                                     </a>
-                                  </CardContent>
-                                </Card>
+                                </CardContent>
+                              </Card>
                               );
                             })}
                           </div>

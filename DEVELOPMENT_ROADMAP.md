@@ -1,4 +1,4 @@
-# BuildFlow Development Roadmap & Progress
+# CompanAI Development Roadmap & Progress
 
 > **AI-Powered Beginner Coding Mentorship Platform**  
 > From Idea to App in Weeks, Not Years
@@ -7,7 +7,7 @@
 
 ## 🎯 **PROJECT OVERVIEW**
 
-BuildFlow transforms complete coding novices into confident app builders through:
+CompanAI transforms complete coding novices into confident app builders through:
 - **AI-guided education** with personalized mentorship
 - **Progressive skill development** with real understanding
 - **Tool orchestration** (connecting Lovable, Cursor, Firebase workflows)
@@ -15,21 +15,21 @@ BuildFlow transforms complete coding novices into confident app builders through
 
 ## 🧭 **PRODUCT VISION: "The Intelligent Bridge Between AI Tools"**
 
-### **✅ What BuildFlow IS:**
+### **✅ What CompanAI IS:**
 - **Educational Platform** - Teach users what each tool does and why
 - **Workflow Orchestrator** - Guide users between Lovable → GitHub → Cursor
 - **Intelligent Prompter** - Generate optimal prompts for each tool
 - **Progress Tracker** - Monitor learning journey and achievements
 - **Community Hub** - Connect learners and share knowledge
 
-### **❌ What BuildFlow is NOT:**
+### **❌ What CompanAI is NOT:**
 - **Code Editor Replacement** - Users use Cursor for actual coding
 - **GitHub Alternative** - Users use Lovable's GitHub integration
 - **Deployment Platform** - Users handle deployment via existing tools
 - **All-in-One IDE** - We connect tools, not replace them
 
 ### **🎯 Core Philosophy:**
-**"Understand your tools, don't build blindly"** - BuildFlow makes users confident with their toolkit rather than dependent on black boxes.
+**"Understand your tools, don't build blindly"** - CompanAI makes users confident with their toolkit rather than dependent on black boxes.
 
 ---
 

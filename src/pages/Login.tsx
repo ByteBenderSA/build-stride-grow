@@ -48,7 +48,7 @@ const Login = () => {
                 <Code className="w-4 h-4 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                BuildFlow
+                CompanAI
               </span>
             </div>
             <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>

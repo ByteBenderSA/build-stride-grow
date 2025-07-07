@@ -46,6 +46,11 @@ const Landing = () => {
           </span>
         </div>
         <div className="flex items-center space-x-4">
+          <Link to="/pricing">
+            <Button variant="ghost" className="text-gray-600 hover:text-purple-600 transition-colors">
+              Pricing
+            </Button>
+          </Link>
           <Link to="/login">
             <Button variant="ghost" className="text-gray-600 hover:text-purple-600 transition-colors">
               Login
@@ -73,7 +78,7 @@ const Landing = () => {
             </span>
             <br />
             <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              Working Code in 24 Hours
+              Working App in 24 Hours
             </span>
           </h1>
           
@@ -129,18 +134,18 @@ const Landing = () => {
               index === 1 ? 'bg-gradient-to-br from-blue-50 to-blue-100' :
               'bg-gradient-to-br from-green-50 to-green-100'
             }`}>
-              <CardContent className="p-0 text-center">
+            <CardContent className="p-0 text-center">
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 mx-auto shadow-lg ${
                   index === 0 ? 'bg-gradient-to-r from-purple-600 to-purple-700' :
                   index === 1 ? 'bg-gradient-to-r from-blue-600 to-blue-700' :
                   'bg-gradient-to-r from-green-600 to-green-700'
                 } text-white`}>
                   {feature.icon}
-                </div>
+              </div>
                 <h3 className="text-2xl font-bold mb-4 text-gray-900">{feature.title}</h3>
                 <p className="text-gray-600 leading-relaxed">{feature.description}</p>
-              </CardContent>
-            </Card>
+            </CardContent>
+          </Card>
           ))}
         </div>
       </section>
@@ -285,17 +290,42 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-50 py-12 border-t border-gray-100">
-        <div className="container mx-auto px-6 text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="container mx-auto px-6">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div className="md:col-span-2">
+              <div className="flex items-center space-x-3 mb-6">
             <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl flex items-center justify-center shadow-lg">
               <Code className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-2xl font-bold">Companai</span>
+              </div>
+              <p className="text-gray-400 leading-relaxed max-w-md">
+                Turn any app idea into working code in 24 hours. The AI development accelerator that actually works.
+              </p>
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">
-              Companai
-            </span>
+            
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Product</h3>
+              <ul className="space-y-2">
+                <li><Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link></li>
+                <li><Link to="/dashboard" className="text-gray-400 hover:text-white transition-colors">Dashboard</Link></li>
+                <li><Link to="/idea-workshop" className="text-gray-400 hover:text-white transition-colors">Idea Workshop</Link></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Legal</h3>
+              <ul className="space-y-2">
+                <li><Link to="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link></li>
+                <li><Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
+              </ul>
+            </div>
           </div>
-          <p className="text-gray-600">© 2024 Companai. Accelerating app development with AI.</p>
+          
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+            <p>&copy; 2024 CompanAI. All rights reserved. Proudly South African.</p>
+          </div>
         </div>
       </footer>
     </div>

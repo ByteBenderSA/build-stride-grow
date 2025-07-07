@@ -99,10 +99,10 @@ const WelcomeModal = ({ isOpen, onSelectPath, onClose }: WelcomeModalProps) => {
             </div>
           </div>
           <DialogTitle className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-            Welcome to BuildFlow! 🚀
+            Welcome to CompanAI! 🚀
           </DialogTitle>
           <p className="text-sm md:text-lg text-gray-600 max-w-2xl mx-auto">
-            BuildFlow helps you turn ideas into real apps while learning modern development tools. 
+            CompanAI helps you turn ideas into real apps while learning modern development tools. 
             Let's customize your experience based on your background.
           </p>
         </DialogHeader>

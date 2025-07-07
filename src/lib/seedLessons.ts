@@ -61,7 +61,7 @@ const TECH_ESSENTIALS_PATH: LearningPath = {
   prerequisites: [],
   outcomes: [
     'Understand what each tool does and why it\'s important',
-    'Know how to use each tool in the BuildFlow workflow',
+            'Know how to use each tool in the CompanAI workflow',
     'Build apps with confidence, not blindly',
     'Have a solid foundation for advanced features'
   ],
