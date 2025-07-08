@@ -31,7 +31,7 @@ import {
   ExternalLink,
   Database
 } from "lucide-react";
-import { geminiService } from "@/lib/gemini";
+import { geminiService } from "@/lib/ai-config";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   createProject, 

@@ -23,7 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserProjects, updateProject } from "@/lib/firestore";
 import type { Project } from "@/lib/firestore";
-import { geminiService } from "@/lib/gemini";
+import { geminiService } from "@/lib/ai-config";
 
 // Dynamic Prompt Generation Component
 const DynamicPromptSection = ({ 

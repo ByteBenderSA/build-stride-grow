@@ -18,9 +18,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { 
   checkUsageLimit, 
   getPlanFeatures, 
-  SubscriptionPlan,
-  upgradeUserPlan
+  SubscriptionPlan
 } from "@/lib/subscriptions";
+import { YocoPayment } from "@/components/YocoPayment";
 
 interface UsageLimitModalProps {
   isOpen: boolean;
@@ -36,7 +36,9 @@ export function UsageLimitModal({ isOpen, onClose, type }: UsageLimitModalProps)
     limit: number;
     plan: SubscriptionPlan;
   } | null>(null);
-  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState<string>('');
+  const [paymentError, setPaymentError] = useState<string>('');
 
   useEffect(() => {
     if (isOpen && user) {
@@ -55,27 +57,28 @@ export function UsageLimitModal({ isOpen, onClose, type }: UsageLimitModalProps)
     }
   };
 
-  const handleUpgrade = async (planName: SubscriptionPlan) => {
-    if (!user) return;
+  const handlePaymentSuccess = (paymentData: { message?: string }) => {
+    setPaymentSuccess(paymentData.message || 'Upgrade successful!');
+    setPaymentLoading(false);
     
-    setIsUpgrading(true);
-    try {
-      // In a real app, this would open Paddle checkout
-      // For now, we'll simulate the upgrade
-      await upgradeUserPlan(user.uid, planName);
-      
-      // Refresh usage info
+    // Refresh usage info after successful payment
+    setTimeout(async () => {
       await loadUsageInfo();
-      
-      // Show success message
-      alert(`Successfully upgraded to ${planName} plan!`);
+      setPaymentSuccess('');
       onClose();
-    } catch (error) {
-      console.error('Error upgrading:', error);
-      alert('Failed to upgrade. Please try again.');
-    } finally {
-      setIsUpgrading(false);
-    }
+    }, 2000);
+  };
+
+  const handlePaymentError = (error: string) => {
+    setPaymentError(error);
+    setPaymentLoading(false);
+    setTimeout(() => setPaymentError(''), 5000);
+  };
+
+  const handlePaymentStart = () => {
+    setPaymentLoading(true);
+    setPaymentError('');
+    setPaymentSuccess('');
   };
 
   const getFeatureType = () => {
@@ -143,6 +146,29 @@ export function UsageLimitModal({ isOpen, onClose, type }: UsageLimitModalProps)
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Payment Success/Error Messages */}
+          {paymentSuccess && (
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="text-green-800 font-medium">{paymentSuccess}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
+          {paymentError && (
+            <Card className="bg-red-50 border-red-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-red-600" />
+                  <span className="text-red-800 font-medium">{paymentError}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Current Usage Display */}
           {usageInfo && (
             <Card className="bg-gray-50">
@@ -209,23 +235,14 @@ export function UsageLimitModal({ isOpen, onClose, type }: UsageLimitModalProps)
                         <div className="text-lg font-bold text-gray-900 mb-2">
                           {option.price}
                         </div>
-                        <Button
-                          onClick={() => handleUpgrade(option.plan)}
-                          disabled={isUpgrading}
+                        <YocoPayment
+                          planType={option.plan}
+                          onSuccess={handlePaymentSuccess}
+                          onError={handlePaymentError}
+                          onPaymentStart={handlePaymentStart}
                           className={`bg-gradient-to-r ${option.color} hover:shadow-lg transition-all`}
-                        >
-                          {isUpgrading ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                              Upgrading...
-                            </>
-                          ) : (
-                            <>
-                              Upgrade Now
-                              <ArrowRight className="w-4 h-4 ml-2" />
-                            </>
-                          )}
-                        </Button>
+                          disabled={paymentLoading}
+                        />
                       </div>
                     </div>
                   </CardContent>

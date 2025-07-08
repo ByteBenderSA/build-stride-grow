@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, X, Send, MessageSquare, Lightbulb, Code, HelpCircle, Bot, User, Copy } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { conversationService, Message as ConversationMessage } from "@/lib/conversations";
-import { geminiService, ChatMessage } from "@/lib/gemini";
+import { deepseekService, ChatMessage } from "@/lib/ai-config";
 import { Timestamp } from "firebase/firestore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { checkUsageLimit, incrementUsage } from '@/lib/subscriptions'
@@ -232,11 +232,17 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string>('');
   const [isInitialized, setIsInitialized] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  
+  // Smart scrolling state
+  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Dynamic suggestions based on project context
   const getQuickSuggestions = () => {
@@ -365,22 +371,57 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
     };
   }, [conversationId]);
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // Check if user is at bottom of chat
+  const checkIfAtBottom = () => {
+    if (!messagesContainerRef.current) return true;
+    
+    const container = messagesContainerRef.current;
+    const threshold = 150; // pixels from bottom
+    const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
+    
+    setIsUserAtBottom(isAtBottom);
+    return isAtBottom;
+  };
 
-  // Cleanup on unmount
+  // Handle scroll events
+  const handleScroll = () => {
+    const isAtBottom = checkIfAtBottom();
+    
+    // If user scrolled to bottom, resume auto-scrolling
+    if (isAtBottom && !shouldAutoScroll) {
+      setShouldAutoScroll(true);
+    }
+    // If user scrolled away from bottom, pause auto-scrolling
+    else if (!isAtBottom && shouldAutoScroll) {
+      setShouldAutoScroll(false);
+    }
+  };
+
+  // Smart auto-scroll: only scroll if user is at bottom
   useEffect(() => {
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
-    };
+    if (shouldAutoScroll && isUserAtBottom) {
+      scrollToBottom();
+    }
+  }, [messages, shouldAutoScroll, isUserAtBottom]);
+
+  // Add scroll listener
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
   }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Force scroll to bottom (for user actions like sending message)
+  const forceScrollToBottom = () => {
+    setShouldAutoScroll(true);
+    setIsUserAtBottom(true);
+    scrollToBottom();
   };
 
   const copyToClipboard = (text: string) => {
@@ -410,7 +451,7 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
     
     // Force immediate UI update and scroll
     setTimeout(() => {
-      scrollToBottom();
+      forceScrollToBottom();
       
       // Add AI thinking message after user message is visible
       const tempAIMessage: UIMessage = {
@@ -455,7 +496,7 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
         let typingTimeoutId: NodeJS.Timeout | null = null;
 
         // Use local analysis instead of API call
-        const messageAnalysis = geminiService.analyzeUserMessageSync(content);
+        const messageAnalysis = deepseekService.analyzeUserMessageSync(content);
 
         // Parallel operations for better performance
         const [, , recentMessages, conversation] = await Promise.all([
@@ -519,7 +560,7 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
         };
         
         // Generate AI response with smooth streaming
-        const aiResponse = await geminiService.generateStreamingResponse(
+        const aiResponse = await deepseekService.generateStreamingResponse(
           chatMessages, 
           context,
           content,
@@ -544,7 +585,7 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
           aiResponse,
           'assistant',
           {
-            aiModel: 'gemini-2.0-flash',
+            aiModel: 'deepseek-chat',
             topics: messageAnalysis.topics,
             turnId: turnId
           } as any
@@ -601,7 +642,7 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
               <MessageSquare className="w-4 h-4" />
               <CardTitle className="text-lg">AI Coding Mentor</CardTitle>
               <Badge className="bg-white/20 text-white text-xs px-2 py-0.5">
-                ✨ Gemini AI
+                ✨ DeepSeek V3
               </Badge>
             </div>
             <Button
@@ -635,7 +676,7 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
             {!isInitialized ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
@@ -709,44 +750,19 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
                             <p className="text-sm whitespace-pre-wrap leading-relaxed text-white">{message.content}</p>
                           </div>
                         ) : message.isLoading ? (
-                          // Show typing indicator for loading AI messages
                           <div className="space-y-3">
                             <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                              </div>
-                              <span className="text-sm text-purple-600 font-medium">Thinking...</span>
-                            </div>
-                            <div className="w-24 h-1 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full animate-pulse"></div>
+                              <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                              <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                              <span className="text-gray-600 text-sm">Thinking...</span>
                             </div>
                           </div>
                         ) : (
-                          // Show formatted AI response (including partial streaming content)
-                          message.content ? (
-                            <FormattedMessage 
-                              content={message.content} 
-                              onCopyCode={copyToClipboard}
-                            />
-                          ) : (
-                            // Show typing indicator for empty content that's about to stream
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
-                                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                              </div>
-                              <span className="text-sm text-purple-600 font-medium">Starting response...</span>
-                            </div>
-                          )
+                          <FormattedMessage content={message.content} onCopyCode={copyToClipboard} />
                         )}
-                        <p className={`text-xs mt-3 pt-2 border-t ${
-                          message.role === 'user' 
-                            ? 'text-white/70 border-white/20' 
-                            : 'text-gray-500 border-gray-100'
-                        }`}>
+                        
+                        <p className="text-xs mt-3 pt-2 border-t text-gray-500 border-gray-100">
                           {message.timestamp.toLocaleTimeString([], { 
                             hour: '2-digit', 
                             minute: '2-digit' 
@@ -758,24 +774,26 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
                 ))}
               </>
             )}
+            
+
+            
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Suggestions - show only if there's just the welcome message */}
-          {messages.length === 0 && !isLoading && isInitialized && (
-            <div className="px-4 py-3 border-t bg-gradient-to-r from-gray-50 to-blue-50">
-              <p className="text-sm text-gray-700 font-medium mb-3">💡 Try these suggestions:</p>
+          {/* Quick Suggestions */}
+          {messages.length === 0 && (
+            <div className="p-4 border-t bg-gray-50">
               <div className="flex flex-wrap gap-2">
                 {quickSuggestions.map((suggestion, index) => (
                   <Button
                     key={index}
                     variant="outline"
                     size="sm"
+                    className={`text-xs ${suggestion.color} border-0 hover:opacity-80`}
                     onClick={() => handleSuggestionClick(suggestion.text)}
-                    className="text-xs hover:bg-purple-50 hover:border-purple-200 transition-colors"
                     disabled={isLoading}
                   >
-                    <suggestion.icon className="w-3 h-3 mr-1.5" />
+                    <suggestion.icon className="w-3 h-3 mr-1" />
                     {suggestion.text}
                   </Button>
                 ))}
@@ -784,34 +802,32 @@ const AIAssistant = ({ onClose, currentProject, allProjects }: AIAssistantProps)
           )}
 
           {/* Input */}
-          <div className="px-4 py-3 border-t bg-white">
-            <form onSubmit={handleSubmit} className="flex gap-3">
+          <div className="border-t bg-white p-4">
+            <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask me anything about coding..."
-                className="flex-1 bg-gray-50 border-gray-200 focus-visible:ring-purple-500 focus-visible:bg-white transition-colors"
-                disabled={isLoading || !isInitialized}
+                placeholder="Ask anything about coding, debugging, or your project..."
+                disabled={isLoading}
+                className="flex-1"
+                autoComplete="off"
               />
-              <Button
-                type="submit"
-                disabled={!inputValue.trim() || isLoading || !isInitialized}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 px-4"
+              <Button 
+                type="submit" 
+                disabled={isLoading || !inputValue.trim()}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
+                <Send className="w-4 h-4" />
               </Button>
             </form>
           </div>
         </CardContent>
       </Card>
 
+      {/* Usage Limit Modal */}
       <UsageLimitModal 
-        isOpen={showLimitModal}
-        onClose={() => setShowLimitModal(false)}
+        isOpen={showLimitModal} 
+        onClose={() => setShowLimitModal(false)} 
         type="ai"
       />
     </div>
