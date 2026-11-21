@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import WorkflowGuide from "@/components/WorkflowGuide";
 import AIAssistant from "@/components/AIAssistant";
+import BuildReport from "@/components/BuildReport";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserProjects, updateProject, featureLabels } from "@/lib/firestore";
@@ -1671,6 +1672,13 @@ Live: https://${projectSlug}.web.app
                 </Card>
               )
             ))}
+
+            {/* Build Report — paste Lovable/Cursor output to track what's done */}
+            {currentProject && (
+              <div className="mt-6">
+                <BuildReport project={currentProject} />
+              </div>
+            )}
           </div>
         </div>
       </div>
