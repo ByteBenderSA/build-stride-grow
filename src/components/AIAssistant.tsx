@@ -11,7 +11,7 @@ import { Timestamp } from "firebase/firestore";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { checkUsageLimit, incrementUsage } from '@/lib/subscriptions'
 import { UsageLimitModal } from '@/components/ui/usage-limit-modal'
-import type { Project } from "@/lib/firestore";
+import { featureLabels, type Project } from "@/lib/firestore";
 
 interface AIAssistantProps {
   onClose: () => void;
@@ -190,8 +190,9 @@ const generateProjectContext = (currentProject?: Project | null, allProjects?: P
     context += `🔧 Tech Stack: ${currentProject.techStack.join(", ")}\n`;
     context += `💫 Difficulty: ${currentProject.difficulty}\n`;
     
-    if (currentProject.features && currentProject.features.length > 0) {
-      context += `✨ Key Features: ${currentProject.features.slice(0, 3).join(", ")}${currentProject.features.length > 3 ? "..." : ""}\n`;
+    const projectFeatureLabels = featureLabels(currentProject.features);
+    if (projectFeatureLabels.length > 0) {
+      context += `✨ Key Features: ${projectFeatureLabels.slice(0, 3).join(", ")}${projectFeatureLabels.length > 3 ? "..." : ""}\n`;
     }
     
     // Add specific help based on current step
