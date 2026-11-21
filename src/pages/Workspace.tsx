@@ -24,6 +24,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getUserProjects, updateProject, featureLabels } from "@/lib/firestore";
 import type { Project } from "@/lib/firestore";
 import { geminiService } from "@/lib/ai-config";
+import { attachAppendixToSplitPrompt } from "@/lib/promptAppendix";
 
 // Dynamic Prompt Generation Component
 const DynamicPromptSection = ({ 
@@ -95,9 +96,13 @@ const DynamicPromptSection = ({
     
     setIsGenerating(true);
     try {
-      const prompt = await onGenerate(project, selectedColorScheme);
+      const rawPrompt = await onGenerate(project, selectedColorScheme);
+      // Attach the build-report appendix to the Lovable half of the prompt so
+      // the user, when they copy-paste into Lovable, automatically asks it to
+      // emit a parseable completion report we can diff against the project.
+      const prompt = attachAppendixToSplitPrompt(rawPrompt, project);
       setGeneratedPrompt(prompt);
-      
+
       // Save the new prompts to Firestore
       await savePromptsToFirestore(prompt, selectedColorScheme);
       
