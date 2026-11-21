@@ -33,13 +33,14 @@ import {
 } from "lucide-react";
 import { geminiService } from "@/lib/ai-config";
 import { useAuth } from "@/contexts/AuthContext";
-import { 
-  createProject, 
-  createIdeaWorkflow, 
-  updateIdeaWorkflow, 
-  getUserActiveIdeaWorkflow, 
+import {
+  createProject,
+  createIdeaWorkflow,
+  updateIdeaWorkflow,
+  getUserActiveIdeaWorkflow,
   completeIdeaWorkflow,
-  type IdeaWorkflow 
+  toProjectFeatures,
+  type IdeaWorkflow
 } from "@/lib/firestore";
 import { checkUsageLimit, incrementUsage } from '@/lib/subscriptions'
 import { UsageLimitModal } from '@/components/ui/usage-limit-modal'
@@ -701,7 +702,7 @@ Please implement a secure, scalable backend with proper error handling, validati
         timeEstimate: idea.timeEstimate,
         techStack: idea.techStack,
         marketPotential: idea.marketPotential as 'Low' | 'Medium' | 'High',
-        features: idea.features,
+        features: toProjectFeatures(idea.features),
         ownerId: user.id,
         status: 'planning' as const,
         progress: {

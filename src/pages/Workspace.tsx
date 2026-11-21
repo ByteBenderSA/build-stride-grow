@@ -21,7 +21,7 @@ import WorkflowGuide from "@/components/WorkflowGuide";
 import AIAssistant from "@/components/AIAssistant";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserProjects, updateProject } from "@/lib/firestore";
+import { getUserProjects, updateProject, featureLabels } from "@/lib/firestore";
 import type { Project } from "@/lib/firestore";
 import { geminiService } from "@/lib/ai-config";
 
@@ -552,7 +552,7 @@ REMEMBER: Frontend is complete, focus on backend integration, real data, and pro
 
 Title: ${project.title}
 Description: ${project.description}
-Features: ${project.features.join(', ')}
+Features: ${featureLabels(project.features).join(', ')}
 Tech Stack: ${project.techStack.join(', ')}
 Difficulty: ${project.difficulty}
 
@@ -599,9 +599,10 @@ Ready to build your first app? Head to the **Idea Workshop** to generate your pe
     }
 
     const projectSlug = project.title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
-    
+    const projectFeatureLabels = featureLabels(project.features);
+
     // Clean and validate features - remove asterisks, colons, and malformed text
-    const cleanFeatures = project.features
+    const cleanFeatures = projectFeatureLabels
       .map(feature => {
         // Clean up malformed features - comprehensive cleaning
         return feature
@@ -972,16 +973,16 @@ ${projectSlug}_settings/
 - Offline support with data sync
 
 ### **PROJECT-SPECIFIC INTEGRATIONS:**
-${project.features.some(f => f.toLowerCase().includes('ai') || f.toLowerCase().includes('smart') || f.toLowerCase().includes('recommendation')) ? `
-- **AI Features:** Implement intelligent functionality for ${project.features.filter(f => f.toLowerCase().includes('ai') || f.toLowerCase().includes('smart') || f.toLowerCase().includes('recommendation')).join(', ')}
+${projectFeatureLabels.some(f => f.toLowerCase().includes('ai') || f.toLowerCase().includes('smart') || f.toLowerCase().includes('recommendation')) ? `
+- **AI Features:** Implement intelligent functionality for ${projectFeatureLabels.filter(f => f.toLowerCase().includes('ai') || f.toLowerCase().includes('smart') || f.toLowerCase().includes('recommendation')).join(', ')}
 - Connect to appropriate AI services for your specific features` : ''}
-${project.features.some(f => f.toLowerCase().includes('payment') || f.toLowerCase().includes('purchase') || f.toLowerCase().includes('subscription') || f.toLowerCase().includes('billing')) ? `
-- **Payment Features:** Implement secure payment processing for ${project.features.filter(f => f.toLowerCase().includes('payment') || f.toLowerCase().includes('purchase') || f.toLowerCase().includes('subscription') || f.toLowerCase().includes('billing')).join(', ')}
+${projectFeatureLabels.some(f => f.toLowerCase().includes('payment') || f.toLowerCase().includes('purchase') || f.toLowerCase().includes('subscription') || f.toLowerCase().includes('billing')) ? `
+- **Payment Features:** Implement secure payment processing for ${projectFeatureLabels.filter(f => f.toLowerCase().includes('payment') || f.toLowerCase().includes('purchase') || f.toLowerCase().includes('subscription') || f.toLowerCase().includes('billing')).join(', ')}
 - Set up payment gateway integration` : ''}
-${project.features.some(f => f.toLowerCase().includes('map') || f.toLowerCase().includes('location') || f.toLowerCase().includes('geo')) ? `
-- **Location Services:** Implement mapping and location features for ${project.features.filter(f => f.toLowerCase().includes('map') || f.toLowerCase().includes('location') || f.toLowerCase().includes('geo')).join(', ')}
+${projectFeatureLabels.some(f => f.toLowerCase().includes('map') || f.toLowerCase().includes('location') || f.toLowerCase().includes('geo')) ? `
+- **Location Services:** Implement mapping and location features for ${projectFeatureLabels.filter(f => f.toLowerCase().includes('map') || f.toLowerCase().includes('location') || f.toLowerCase().includes('geo')).join(', ')}
 - Integrate Google Maps or similar location APIs` : ''}
-- **Core Data Management:** Focus on ${project.features.slice(0, 3).join(', ')} functionality
+- **Core Data Management:** Focus on ${projectFeatureLabels.slice(0, 3).join(', ')} functionality
 - **Input Validation:** Ensure data integrity for your specific features
 
 ### **PERFORMANCE & SCALABILITY:**
@@ -1049,9 +1050,9 @@ ${project.features.some(f => f.toLowerCase().includes('map') || f.toLowerCase().
 **Make this app production-ready and impressive enough to showcase in a portfolio!**
 
 ## **💡 PROJECT-SPECIFIC REQUIREMENTS:**
-- Add TypeScript types for ${project.features.slice(0, 3).join(', ')} data structures
-- Implement error handling specifically for ${project.features[0] || 'main functionality'} operations
-- Create loading states for ${project.features.join(', ')} interactions
+- Add TypeScript types for ${projectFeatureLabels.slice(0, 3).join(', ')} data structures
+- Implement error handling specifically for ${projectFeatureLabels[0] || 'main functionality'} operations
+- Create loading states for ${projectFeatureLabels.join(', ')} interactions
 - Focus on making ${project.title} responsive and user-friendly
 - Optimize for the specific use case: ${project.description}
 

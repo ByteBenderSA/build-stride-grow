@@ -17,6 +17,45 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 
+// Structured feature with build-report status tracking.
+// Legacy projects store `features: string[]` — read-time normalization promotes
+// them to this shape. See `normalizeProjectFeatures` / `toProjectFeatures`.
+export type FeatureStatus =
+  | 'pending'
+  | 'built'
+  | 'partial'
+  | 'missing'
+  | 'blocked';
+
+export interface ProjectFeature {
+  id: string;              // stable id, e.g. "f1" — referenced by build reports
+  label: string;           // human-readable feature description
+  status: FeatureStatus;
+  lastUpdatedFromReport?: string;  // ISO timestamp of the report that set it
+  note?: string;           // AI's comment on partial/blocked status
+}
+
+// Build report submitted by the user after running a prompt in Lovable/Cursor.
+// Stored at projects/{projectId}/buildReports/{reportId}. Parsing happens in a
+// Cloud Function; this type is what the function writes back.
+export interface BuildReport {
+  id: string;
+  projectId: string;
+  ownerId: string;
+  submittedAt: string;
+  promptVersion?: string;
+  source: 'lovable' | 'cursor' | 'other';
+  rawPaste: string;                      // original paste — audit trail
+  parsedFeatures: Array<{
+    id: string;
+    status: FeatureStatus;
+    note?: string;
+  }>;
+  blockers: string[];
+  filesChanged: string[];
+  suggestedNextPrompt?: string;          // follow-up prompt for the gaps
+}
+
 // Project interface
 export interface Project {
   id: string;
@@ -26,7 +65,8 @@ export interface Project {
   category: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   techStack: string[];
-  features: string[];
+  features: ProjectFeature[];
+  completionPct?: number;   // derived from feature statuses after a build report
   timeEstimate: string;
   marketPotential: 'Low' | 'Medium' | 'High';
   status: 'idea' | 'planning' | 'building' | 'completed' | 'deployed';
@@ -57,6 +97,68 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
 }
+
+// Accepts either the legacy string[] shape or the structured shape and returns
+// the structured shape. Call sites that only need labels should use
+// `featureLabels` instead.
+export const normalizeProjectFeatures = (
+  raw: unknown
+): ProjectFeature[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((entry, idx): ProjectFeature => {
+    if (typeof entry === 'string') {
+      return {
+        id: `f${idx + 1}`,
+        label: entry,
+        status: 'pending',
+      };
+    }
+    if (entry && typeof entry === 'object' && 'label' in entry) {
+      const f = entry as Partial<ProjectFeature>;
+      return {
+        id: f.id ?? `f${idx + 1}`,
+        label: f.label ?? '',
+        status: f.status ?? 'pending',
+        lastUpdatedFromReport: f.lastUpdatedFromReport,
+        note: f.note,
+      };
+    }
+    return { id: `f${idx + 1}`, label: String(entry ?? ''), status: 'pending' };
+  });
+};
+
+// Convert raw string features (from idea generation) into structured features.
+export const toProjectFeatures = (labels: string[]): ProjectFeature[] =>
+  labels.map((label, idx) => ({
+    id: `f${idx + 1}`,
+    label,
+    status: 'pending' as FeatureStatus,
+  }));
+
+// Extract just the human-readable labels — tolerant of legacy shape.
+export const featureLabels = (
+  features: ProjectFeature[] | string[] | undefined
+): string[] => {
+  if (!features) return [];
+  return features.map((f) => (typeof f === 'string' ? f : f.label));
+};
+
+// Compute completion percentage from feature statuses (rounded to integer).
+// `partial` counts as 0.5. Returns 0 when there are no features.
+export const computeCompletionPct = (features: ProjectFeature[]): number => {
+  if (!features.length) return 0;
+  const score = features.reduce((sum, f) => {
+    if (f.status === 'built') return sum + 1;
+    if (f.status === 'partial') return sum + 0.5;
+    return sum;
+  }, 0);
+  return Math.round((score / features.length) * 100);
+};
+
+const hydrateProject = (raw: any): Project => ({
+  ...raw,
+  features: normalizeProjectFeatures(raw?.features),
+});
 
 // AI Conversation interface
 export interface Conversation {
@@ -200,11 +302,11 @@ export const createProject = async (project: Omit<Project, 'id' | 'createdAt' | 
 export const getProject = async (projectId: string): Promise<Project | null> => {
   const projectRef = doc(db, 'projects', projectId);
   const projectSnapshot = await getDoc(projectRef);
-  
+
   if (projectSnapshot.exists()) {
-    return projectSnapshot.data() as Project;
+    return hydrateProject(projectSnapshot.data());
   }
-  
+
   return null;
 };
 
@@ -215,9 +317,9 @@ export const getUserProjects = async (userId: string): Promise<Project[]> => {
     where('ownerId', '==', userId),
     orderBy('updatedAt', 'desc')
   );
-  
+
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => doc.data() as Project);
+  return snapshot.docs.map(d => hydrateProject(d.data()));
 };
 
 export const updateProject = async (projectId: string, updates: Partial<Project>): Promise<void> => {
@@ -332,9 +434,83 @@ export const subscribeToUserProjects = (userId: string, callback: (projects: Pro
   );
   
   return onSnapshot(q, (snapshot) => {
-    const projects = snapshot.docs.map(doc => doc.data() as Project);
+    const projects = snapshot.docs.map(d => hydrateProject(d.data()));
     callback(projects);
   });
+};
+
+// Build Report CRUD — stored at projects/{projectId}/buildReports/{reportId}.
+// Writes should go through a Cloud Function so plan limits and token parsing
+// stay server-side; these client helpers exist for reading history and for the
+// tightly scoped case where we already have a parsed report in hand.
+const buildReportsCol = (projectId: string) =>
+  collection(db, 'projects', projectId, 'buildReports');
+
+export const createBuildReport = async (
+  projectId: string,
+  report: Omit<BuildReport, 'id' | 'submittedAt'>
+): Promise<string> => {
+  const reportRef = doc(buildReportsCol(projectId));
+  const newReport: BuildReport = {
+    ...report,
+    id: reportRef.id,
+    projectId,
+    submittedAt: new Date().toISOString(),
+  };
+  await setDoc(reportRef, {
+    ...newReport,
+    submittedAt: serverTimestamp(),
+  });
+  return reportRef.id;
+};
+
+export const getProjectBuildReports = async (
+  projectId: string
+): Promise<BuildReport[]> => {
+  const q = query(buildReportsCol(projectId), orderBy('submittedAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => d.data() as BuildReport);
+};
+
+export const subscribeToProjectBuildReports = (
+  projectId: string,
+  callback: (reports: BuildReport[]) => void
+) => {
+  const q = query(buildReportsCol(projectId), orderBy('submittedAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.docs.map(d => d.data() as BuildReport));
+  });
+};
+
+// Apply a parsed build report to a project's feature statuses. The parser is
+// expected to reference existing feature ids; unknown ids are ignored.
+// Returns the recomputed completion percentage.
+export const applyBuildReportToProject = async (
+  projectId: string,
+  parsedFeatures: BuildReport['parsedFeatures']
+): Promise<number> => {
+  const project = await getProject(projectId);
+  if (!project) throw new Error(`Project ${projectId} not found`);
+
+  const now = new Date().toISOString();
+  const byId = new Map(parsedFeatures.map(p => [p.id, p]));
+  const updatedFeatures: ProjectFeature[] = project.features.map(f => {
+    const parsed = byId.get(f.id);
+    if (!parsed) return f;
+    return {
+      ...f,
+      status: parsed.status,
+      note: parsed.note,
+      lastUpdatedFromReport: now,
+    };
+  });
+
+  const completionPct = computeCompletionPct(updatedFeatures);
+  await updateProject(projectId, {
+    features: updatedFeatures,
+    completionPct,
+  });
+  return completionPct;
 };
 
 export const subscribeToConversation = (conversationId: string, callback: (conversation: Conversation | null) => void) => {
